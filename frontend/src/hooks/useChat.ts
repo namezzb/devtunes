@@ -72,16 +72,30 @@ export function useChat(): UseChatReturn {
     const history: ApiChatMessage[] = messagesRef.current.map(({ role, content }) => ({ role, content }));
     let fullContent = '';
 
+    let pendingUpdate = false;
+
+    const flushUpdate = () => {
+      pendingUpdate = false;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === agentMessageId ? { ...msg, content: fullContent } : msg
+        )
+      );
+    };
+
+    const scheduleUpdate = () => {
+      if (!pendingUpdate) {
+        pendingUpdate = true;
+        requestAnimationFrame(flushUpdate);
+      }
+    };
+
     abortControllerRef.current = chat(
       content,
       history,
       (chunk) => {
         fullContent += chunk;
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === agentMessageId ? { ...msg, content: fullContent } : msg
-          )
-        );
+        scheduleUpdate();
       },
       () => {
         setIsStreaming(false);

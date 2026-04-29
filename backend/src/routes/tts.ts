@@ -1,7 +1,8 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, json } from 'express';
 import axios from 'axios';
 
 const router = Router();
+router.use(json());
 
 const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || '';
 const FISH_AUDIO_API_URL = process.env.FISH_AUDIO_API_URL || 'https://api.fish.audio';
