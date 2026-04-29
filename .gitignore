@@ -1,0 +1,54 @@
+# ==========================================
+# DEVTunes - Root .gitignore (Monorepo)
+# ==========================================
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+*/dist/
+.vite/
+*/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+*/npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Cache
+.cache/
+*/.cache/
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+*/*.tsbuildinfo
+
+# Test coverage
+coverage/
+*/coverage/
+
+# Backend (future)
+backend/node_modules/
+backend/dist/
+backend/.env
+
+# Misc
+*.tgz

@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-deep: #050510;           /* 深空黑 - 主背景 */
+    --bg-surface: #0a0a1a;        /* 表面层 */
+    --bg-card: #0f0f23;           /* 卡片背景 */
+    
+    --aurora-start: #00FFC8;       /* 极光青 */
+    --aurora-mid: #8B5CF6;         /* 极光紫 */
+    --aurora-end: #FF6B9D;         /* 极光粉 */
+    
+    --star-white: #E8E8FF;         /* 星尘白 */
+    --star-gold: #FFD700;          /* 星光金 */
+    
+    --text-primary: #FFFFFF;
+    --text-secondary: #A0A0B0;
+    --text-muted: #6B6B7B;
+    
+    --accent-cyan: #00FFC8;
+    --accent-violet: #8B5CF6;
+    --accent-pink: #FF6B9D;
+    
+    --success: #00D26A;
+    --warning: #FFB800;
+    --error: #FF4757;
+  }
+
+  body {
+    @apply bg-[var(--bg-deep)] text-[var(--text-primary)] antialiased overflow-hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background-color: rgba(10, 10, 26, 0.6);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .glass-card {
+    background-color: rgba(15, 15, 35, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[var(--aurora-start)] via-[var(--aurora-mid)] to-[var(--aurora-end)];
+  }
+  
+  .border-gradient {
+    position: relative;
+  }
+  
+  .border-gradient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(to right, var(--aurora-start), var(--aurora-mid), var(--aurora-end));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
