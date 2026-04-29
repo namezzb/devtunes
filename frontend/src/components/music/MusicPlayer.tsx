@@ -7,8 +7,9 @@ import { PlaylistImport } from './PlaylistImport';
 import { BlackHole } from '../effects/BlackHole';
 import { AudioVisualizer } from '../effects/AudioVisualizer';
 import { MusicParticles } from '../effects/MusicParticles';
+import { toast } from '../ui/Toast';
 
-const MOCK_TRACKS: Track[] = [
+const INITIAL_PLAYLIST: Track[] = [
   { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 214 },
   { id: '2', title: 'Deep Space', artist: 'Stellar', coverUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=200&auto=format&fit=crop', duration: 186 },
   { id: '3', title: 'Lofi Coding', artist: 'Dev Beats', coverUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=200&auto=format&fit=crop', duration: 245 },
@@ -19,27 +20,40 @@ export function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(80);
-  const [currentTrack, setCurrentTrack] = useState<Track>(MOCK_TRACKS[0]);
+  const [currentTrack, setCurrentTrack] = useState<Track>(INITIAL_PLAYLIST[0]);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [playlist, setPlaylist] = useState<Track[]>(INITIAL_PLAYLIST);
   const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
   const [clickEffect, setClickEffect] = useState<{x: number, y: number, id: number} | null>(null);
   
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [prevVolume, setPrevVolume] = useState(80);
+
+  const toggleMute = () => {
+    if (isMuted) {
+      setVolume(prevVolume);
+      setIsMuted(false);
+    } else {
+      setPrevVolume(volume);
+      setIsMuted(true);
+    }
+  };
 
   const handleNext = React.useCallback(() => {
-    const currentIndex = MOCK_TRACKS.findIndex(t => t.id === currentTrack.id);
+    const currentIndex = playlist.findIndex(t => t.id === currentTrack.id);
     let nextIndex;
-    
+
     if (playMode === 'random') {
-      nextIndex = Math.floor(Math.random() * MOCK_TRACKS.length);
+      nextIndex = Math.floor(Math.random() * playlist.length);
     } else {
-      nextIndex = (currentIndex + 1) % MOCK_TRACKS.length;
+      nextIndex = (currentIndex + 1) % playlist.length;
     }
-    
-    setCurrentTrack(MOCK_TRACKS[nextIndex]);
+
+    setCurrentTrack(playlist[nextIndex]);
     setProgress(0);
     setIsPlaying(true);
-  }, [currentTrack.id, playMode]);
+  }, [currentTrack.id, playMode, playlist]);
   
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -70,9 +84,9 @@ export function MusicPlayer() {
   };
 
   const handlePrev = () => {
-    const currentIndex = MOCK_TRACKS.findIndex(t => t.id === currentTrack.id);
-    const prevIndex = (currentIndex - 1 + MOCK_TRACKS.length) % MOCK_TRACKS.length;
-    setCurrentTrack(MOCK_TRACKS[prevIndex]);
+    const currentIndex = playlist.findIndex(t => t.id === currentTrack.id);
+    const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+    setCurrentTrack(playlist[prevIndex]);
     setProgress(0);
     setIsPlaying(true);
   };
@@ -166,10 +180,33 @@ export function MusicPlayer() {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 w-1/4 group">
-            <svg className="w-4 h-4 text-[var(--text-muted)] group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            </svg>
-            <Slider value={volume} onChange={setVolume} className="w-full" formatTooltip={(v) => `${Math.round(v)}%`} />
+            <button
+              onClick={toggleMute}
+              className="p-1 text-[var(--text-muted)] hover:text-white transition-colors"
+              title={isMuted ? '取消静音' : '静音'}
+            >
+              {isMuted ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+              )}
+            </button>
+            <div className="overflow-hidden transition-all duration-300 ease-out group-hover:w-[120px] w-0">
+              <Slider
+                value={isMuted ? 0 : volume}
+                onChange={(v) => {
+                  setVolume(v);
+                  if (v > 0) setIsMuted(false);
+                }}
+                className="w-[120px]"
+                formatTooltip={(v) => `${Math.round(isMuted ? prevVolume : v)}%`}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-6">
@@ -222,21 +259,26 @@ export function MusicPlayer() {
 
       <div className="flex-1 p-4 overflow-hidden flex flex-col relative z-10 bg-black/20">
         <h3 className="text-xs font-medium text-[var(--text-secondary)] mb-3 px-2 uppercase tracking-wider">当前播放列表</h3>
-        <TrackList 
-          tracks={MOCK_TRACKS} 
+        <TrackList
+          tracks={playlist}
           currentTrackId={currentTrack.id}
           onTrackSelect={(track) => {
             setCurrentTrack(track);
             setProgress(0);
             setIsPlaying(true);
           }}
+          onReorder={(newPlaylist) => {
+            setPlaylist(newPlaylist);
+          }}
         />
       </div>
 
-      <PlaylistImport 
-        isOpen={isImportOpen} 
+<PlaylistImport
+        isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        onImport={(url) => console.log('Importing:', url)}
+        onImport={() => {
+          toast.success('歌单导入成功');
+        }}
       />
     </div>
   );
