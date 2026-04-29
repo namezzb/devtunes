@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from '../ui/Slider';
 import { Button } from '../ui/Button';
@@ -8,8 +8,9 @@ import { BlackHole } from '../effects/BlackHole';
 import { AudioVisualizer } from '../effects/AudioVisualizer';
 import { MusicParticles } from '../effects/MusicParticles';
 import { toast } from '../ui/Toast';
+import { usePlaylist } from '../../hooks/usePlaylist';
 
-const INITIAL_PLAYLIST: Track[] = [
+const MOCK_TRACKS: Track[] = [
   { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 214 },
   { id: '2', title: 'Deep Space', artist: 'Stellar', coverUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=200&auto=format&fit=crop', duration: 186 },
   { id: '3', title: 'Lofi Coding', artist: 'Dev Beats', coverUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=200&auto=format&fit=crop', duration: 245 },
@@ -17,18 +18,27 @@ const INITIAL_PLAYLIST: Track[] = [
 ];
 
 export function MusicPlayer() {
+  const { playlist: apiPlaylist, tracks, loading, error, importPlaylist } = usePlaylist();
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(80);
-  const [currentTrack, setCurrentTrack] = useState<Track>(INITIAL_PLAYLIST[0]);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [playlist, setPlaylist] = useState<Track[]>(INITIAL_PLAYLIST);
+  const [playlist, setPlaylist] = useState<Track[]>(MOCK_TRACKS);
   const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
   const [clickEffect, setClickEffect] = useState<{x: number, y: number, id: number} | null>(null);
-  
+
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(80);
+
+  const displayTracks = tracks.length > 0 ? tracks : playlist;
+
+  useEffect(() => {
+    if (displayTracks.length > 0 && !currentTrack) {
+      setCurrentTrack(displayTracks[0]);
+    }
+  }, [displayTracks, currentTrack]);
 
   const toggleMute = () => {
     if (isMuted) {
@@ -40,24 +50,25 @@ export function MusicPlayer() {
     }
   };
 
-  const handleNext = React.useCallback(() => {
-    const currentIndex = playlist.findIndex(t => t.id === currentTrack.id);
+  const handleNext = useCallback(() => {
+    if (!currentTrack) return;
+    const currentIndex = displayTracks.findIndex(t => t.id === currentTrack.id);
     let nextIndex;
 
     if (playMode === 'random') {
-      nextIndex = Math.floor(Math.random() * playlist.length);
+      nextIndex = Math.floor(Math.random() * displayTracks.length);
     } else {
-      nextIndex = (currentIndex + 1) % playlist.length;
+      nextIndex = (currentIndex + 1) % displayTracks.length;
     }
 
-    setCurrentTrack(playlist[nextIndex]);
+    setCurrentTrack(displayTracks[nextIndex]);
     setProgress(0);
     setIsPlaying(true);
-  }, [currentTrack.id, playMode, playlist]);
-  
+  }, [currentTrack, displayTracks, playMode]);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (isPlaying) {
+    if (isPlaying && currentTrack) {
       interval = setInterval(() => {
         setProgress(p => {
           if (p >= currentTrack.duration) {
@@ -69,8 +80,8 @@ export function MusicPlayer() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack.duration, handleNext]);
-  
+  }, [isPlaying, currentTrack, handleNext]);
+
   const togglePlay = (e: React.MouseEvent) => {
     if (!isPlaying) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -84,9 +95,10 @@ export function MusicPlayer() {
   };
 
   const handlePrev = () => {
-    const currentIndex = playlist.findIndex(t => t.id === currentTrack.id);
-    const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
-    setCurrentTrack(playlist[prevIndex]);
+    if (!currentTrack) return;
+    const currentIndex = displayTracks.findIndex(t => t.id === currentTrack.id);
+    const prevIndex = (currentIndex - 1 + displayTracks.length) % displayTracks.length;
+    setCurrentTrack(displayTracks[prevIndex]);
     setProgress(0);
     setIsPlaying(true);
   };
@@ -100,7 +112,7 @@ export function MusicPlayer() {
   return (
     <div className="glass-card flex flex-col h-full overflow-hidden relative z-10 shadow-[0_0_40px_rgba(0,0,0,0.5)] border-white/10">
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--aurora-start)]/5 via-transparent to-[var(--aurora-end)]/5 pointer-events-none" />
-      
+
       <div className="p-5 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md relative z-10">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
           <svg className="w-5 h-5 text-[var(--aurora-start)] drop-shadow-[0_0_8px_var(--aurora-start)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -130,15 +142,15 @@ export function MusicPlayer() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4 group">
             <div className="relative w-14 h-14 rounded-xl overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-              <motion.img 
-                src={currentTrack.coverUrl} 
-                alt="Cover" 
+              <motion.img
+                src={currentTrack?.coverUrl || ''}
+                alt="Cover"
                 className="w-full h-full object-cover"
-                animate={{ 
+                animate={{
                   rotate: isPlaying ? 360 : 0,
                   scale: isPlaying ? 1.1 : 1
                 }}
-                transition={{ 
+                transition={{
                   rotate: { duration: 20, repeat: Infinity, ease: "linear" },
                   scale: { duration: 0.5 }
                 }}
@@ -148,13 +160,13 @@ export function MusicPlayer() {
               )}
             </div>
             <div>
-              <h3 className="text-white font-medium text-lg group-hover:text-[var(--aurora-start)] transition-colors">{currentTrack.title}</h3>
-              <p className="text-[var(--text-secondary)] text-sm">{currentTrack.artist}</p>
+              <h3 className="text-white font-medium text-lg group-hover:text-[var(--aurora-start)] transition-colors">{currentTrack?.title || 'No track selected'}</h3>
+              <p className="text-[var(--text-secondary)] text-sm">{currentTrack?.artist || 'Select a track'}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => setPlayMode(m => m === 'loop' ? 'random' : 'loop')}
               className={`p-2 rounded-lg transition-all duration-300 ${playMode === 'random' ? 'text-[var(--aurora-start)] bg-[var(--aurora-start)]/10 shadow-[0_0_15px_rgba(0,255,200,0.2)]' : 'text-[var(--text-muted)] hover:text-white hover:bg-white/5'}`}
             >
@@ -166,15 +178,15 @@ export function MusicPlayer() {
         </div>
 
         <div className="space-y-2 mb-6">
-          <Slider 
-            value={progress} 
-            max={currentTrack.duration} 
-            onChange={setProgress} 
+          <Slider
+            value={progress}
+            max={currentTrack?.duration || 0}
+            onChange={setProgress}
             formatTooltip={formatTime}
           />
           <div className="flex justify-between text-xs text-[var(--text-muted)] font-mono tracking-wider">
             <span>{formatTime(progress)}</span>
-            <span>{formatTime(currentTrack.duration)}</span>
+            <span>{formatTime(currentTrack?.duration || 0)}</span>
           </div>
         </div>
 
@@ -215,9 +227,9 @@ export function MusicPlayer() {
                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
               </svg>
             </button>
-            
+
             <div className="relative">
-              <button 
+              <button
                 onClick={togglePlay}
                 className="relative w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--aurora-start)] to-[var(--aurora-mid)] text-white shadow-[0_0_20px_rgba(0,255,200,0.4)] hover:shadow-[0_0_30px_rgba(0,255,200,0.6)] hover:scale-105 transition-all duration-300 z-10"
               >
@@ -231,7 +243,7 @@ export function MusicPlayer() {
                   </svg>
                 )}
               </button>
-              
+
               <AnimatePresence>
                 {clickEffect && (
                   <motion.div
@@ -245,23 +257,26 @@ export function MusicPlayer() {
                 )}
               </AnimatePresence>
             </div>
-            
+
             <button onClick={handleNext} className="p-2 text-[var(--text-secondary)] hover:text-white hover:scale-110 transition-all">
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
               </svg>
             </button>
           </div>
-          
+
           <div className="w-1/4" />
         </div>
       </div>
 
       <div className="flex-1 p-4 overflow-hidden flex flex-col relative z-10 bg-black/20">
-        <h3 className="text-xs font-medium text-[var(--text-secondary)] mb-3 px-2 uppercase tracking-wider">当前播放列表</h3>
+        <h3 className="text-xs font-medium text-[var(--text-secondary)] mb-3 px-2 uppercase tracking-wider">
+          {loading ? '加载中...' : apiPlaylist ? apiPlaylist.name : '当前播放列表'}
+        </h3>
+        {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
         <TrackList
-          tracks={playlist}
-          currentTrackId={currentTrack.id}
+          tracks={displayTracks}
+          currentTrackId={currentTrack?.id || ''}
           onTrackSelect={(track) => {
             setCurrentTrack(track);
             setProgress(0);
@@ -273,10 +288,12 @@ export function MusicPlayer() {
         />
       </div>
 
-<PlaylistImport
+      <PlaylistImport
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        onImport={() => {
+        onImport={async (url) => {
+          await importPlaylist(url);
+          setIsImportOpen(false);
           toast.success('歌单导入成功');
         }}
       />

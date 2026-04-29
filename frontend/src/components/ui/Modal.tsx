@@ -33,7 +33,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         onClick={onClose}
       />
       
-      <div className="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-[var(--bg-card)] border border-white/10 shadow-2xl transition-all">
+      <div role="dialog" aria-modal="true" className="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-[var(--bg-card)] border border-white/10 shadow-2xl transition-all">
         <div className="border-gradient absolute inset-0 pointer-events-none opacity-50" />
         
         <div className="relative p-6">

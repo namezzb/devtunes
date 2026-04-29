@@ -3,39 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { Button } from '../ui/Button';
-
-interface Message {
-  id: string;
-  role: 'user' | 'agent';
-  content: string;
-  timestamp: string;
-}
-
-const MOCK_MESSAGES: Message[] = [
-  {
-    id: '1',
-    role: 'agent',
-    content: '你好！我是 DEVTunes AI。我可以帮你推荐适合编程的音乐，或者根据你的心情生成专属歌单。今天想听点什么？',
-    timestamp: '10:00'
-  },
-  {
-    id: '2',
-    role: 'user',
-    content: '我在写一个复杂的 React 组件，需要一些能让我专注的音乐。',
-    timestamp: '10:02'
-  },
-  {
-    id: '3',
-    role: 'agent',
-    content: '明白了。写复杂组件需要深度专注。我为你推荐 "Lofi Coding" 歌单，节奏平缓，没有歌词打扰。需要我直接播放吗？',
-    timestamp: '10:02'
-  }
-];
+import { useChat, ChatMessage as ChatMessageType } from '../../hooks/useChat';
 
 export function AgentChat() {
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const { messages, isTyping, sendMessage } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
-  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,26 +19,7 @@ export function AgentChat() {
   }, [messages, isTyping]);
 
   const handleSend = (content: string) => {
-    const newUserMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    
-    setMessages(prev => [...prev, newUserMsg]);
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      const newAgentMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'agent',
-        content: '这是一个模拟的 AI 回复。在实际应用中，这里会连接到大语言模型 API。',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, newAgentMsg]);
-      setIsTyping(false);
-    }, 1500);
+    sendMessage(content);
   };
 
   const handlePlayAudio = (id: string) => {
