@@ -80,10 +80,6 @@ router.post('/', async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
     res.end();
   });
-
-  req.on('close', () => {
-    claude.kill();
-  });
 });
 
 function buildPrompt(message: string, history: ChatMessage[]): string {

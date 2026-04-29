@@ -50,8 +50,38 @@ export function Slider({ value, min = 0, max = 100, onChange, className = '', fo
 
   const showTooltip = (isDragging || isHovered) && formatTooltip;
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const step = (max - min) / 100;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      onChange(Math.min(max, value + step));
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      onChange(Math.max(min, value - step));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      onChange(min);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      onChange(max);
+    } else if (e.key === 'PageUp') {
+      e.preventDefault();
+      onChange(Math.min(max, value + step * 10));
+    } else if (e.key === 'PageDown') {
+      e.preventDefault();
+      onChange(Math.max(min, value - step * 10));
+    }
+  };
+
   return (
-    <div 
+    <div
+      role="slider"
+      tabIndex={0}
+      aria-label="Slider control"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(value)}
+      aria-valuetext={formatTooltip ? formatTooltip(value) : `${Math.round(value)}`}
       className={`relative h-6 flex items-center cursor-pointer group ${className}`}
       ref={trackRef}
       onPointerDown={handlePointerDown}
@@ -60,6 +90,7 @@ export function Slider({ value, min = 0, max = 100, onChange, className = '', fo
       onPointerCancel={handlePointerUp}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onKeyDown={handleKeyDown}
     >
       <div className="absolute w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
         <div 

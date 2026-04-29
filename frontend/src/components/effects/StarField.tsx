@@ -42,6 +42,7 @@ export function StarField({ count = 400 }: StarFieldProps) {
       baseAlpha: Math.random() * 0.5 + 0.1,
       alpha: 0,
       blinkSpeed: Math.random() * 0.02 + 0.005,
+      phase: Math.random() * Math.PI * 2,
       color: Math.random() > 0.8 ? 'var(--star-gold)' : 'var(--star-white)',
       z: Math.random() * 2 + 0.1
     }));
@@ -53,7 +54,7 @@ export function StarField({ count = 400 }: StarFieldProps) {
       mouseY += (targetMouseY - mouseY) * 0.1;
 
       stars.forEach(star => {
-        star.alpha = star.baseAlpha + Math.sin(Date.now() * star.blinkSpeed) * 0.2;
+        star.alpha = star.baseAlpha + Math.sin(Date.now() * star.blinkSpeed + star.phase) * 0.2;
         if (star.alpha < 0) star.alpha = 0;
 
         let x = star.x - mouseX * star.z;

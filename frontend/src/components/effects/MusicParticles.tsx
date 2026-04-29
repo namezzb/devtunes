@@ -23,13 +23,13 @@ export function MusicParticles({ isPlaying }: MusicParticlesProps) {
   const animationRef = useRef<number>();
   const beatTimerRef = useRef<number>(0);
 
-  const colors = [
-    '#00FFC8',
-    '#8B5CF6',
-    '#FF6B9D',
-  ];
-
   useEffect(() => {
+    const colors = [
+      '#00FFC8',
+      '#8B5CF6',
+      '#FF6B9D',
+    ];
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -234,6 +234,7 @@ export function MusicParticles({ isPlaying }: MusicParticlesProps) {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      particlesRef.current = [];
     };
   }, [isPlaying]);
 

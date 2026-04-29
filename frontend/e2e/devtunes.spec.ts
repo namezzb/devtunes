@@ -34,8 +34,8 @@ test.describe('Responsive Layout Tests', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
     await expect(page.locator('nav')).toBeVisible();
-    await expect(page.getByText('Music')).toBeVisible();
-    await expect(page.getByText('AI Chat')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Music' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'AI Chat' })).toBeVisible();
   });
 });
 

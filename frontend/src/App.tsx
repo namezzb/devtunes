@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StarField } from './components/effects/StarField';
 import { Aurora } from './components/effects/Aurora';
 import { AppProvider } from './context/AppContext';
@@ -6,6 +6,19 @@ import { MobileView, DesktopView } from './components/ui/TabNavigation';
 import { ToastProvider } from './components/ui/Toast';
 
 function AppContent() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[var(--bg-deep)] text-white relative overflow-hidden font-sans">
       <StarField count={400} />
@@ -22,8 +35,7 @@ function AppContent() {
         </header>
 
         <main className="flex-1 pb-8 min-h-0">
-          <MobileView />
-          <DesktopView />
+          {isDesktop ? <DesktopView /> : <MobileView />}
         </main>
       </div>
     </div>

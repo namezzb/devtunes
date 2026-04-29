@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { Button } from '../ui/Button';
-import { useChat, ChatMessage as ChatMessageType } from '../../hooks/useChat';
+import { useChat } from '../../hooks/useChat';
 
 export function AgentChat() {
   const { messages, isTyping, sendMessage } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const playingAudioIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -25,11 +26,14 @@ export function AgentChat() {
   const handlePlayAudio = (id: string) => {
     if (playingAudioId === id) {
       setPlayingAudioId(null);
+      playingAudioIdRef.current = null;
     } else {
+      playingAudioIdRef.current = id;
       setPlayingAudioId(id);
       setTimeout(() => {
-        if (playingAudioId === id) {
+        if (playingAudioIdRef.current === id) {
           setPlayingAudioId(null);
+          playingAudioIdRef.current = null;
         }
       }, 3000);
     }

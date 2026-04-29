@@ -12,16 +12,17 @@ interface ChatMessageProps {
 
 export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, id }: ChatMessageProps) {
   const isUser = role === 'user';
-  
+  const isError = content.startsWith('Error:');
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       <div className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse' : 'flex-row'} gap-4`}>
-        
+
         <div className="flex-shrink-0 mt-1">
           {isUser ? (
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--aurora-mid)] to-[var(--aurora-end)] flex items-center justify-center text-white text-xs font-bold shadow-[0_0_15px_rgba(139,92,246,0.4)] ring-2 ring-white/10">
@@ -41,18 +42,20 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
             </div>
           )}
         </div>
-        
+
         <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
           <div className="flex items-center gap-3 mb-1.5 px-1">
             <span className="text-[10px] font-medium tracking-wider text-[var(--text-muted)] uppercase">{timestamp}</span>
           </div>
-          
+
           <div className="relative group">
-            <div 
+            <div
               className={`relative px-5 py-3.5 rounded-2xl text-sm leading-relaxed backdrop-blur-xl transition-all duration-300 ${
-                isUser 
-                  ? 'bg-white/10 text-white rounded-tr-sm hover:bg-white/15 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]' 
-                  : 'bg-[var(--bg-card)]/80 text-[var(--text-primary)] rounded-tl-sm shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]'
+                isError
+                  ? 'bg-red-500/20 border border-red-500/30 text-red-200 rounded-tl-sm'
+                  : isUser
+                    ? 'bg-white/10 text-white rounded-tr-sm hover:bg-white/15 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]'
+                    : 'bg-[var(--bg-card)]/80 text-[var(--text-primary)] rounded-tl-sm shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]'
               }`}
             >
               {!isUser && (

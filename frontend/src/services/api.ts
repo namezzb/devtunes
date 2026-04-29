@@ -169,10 +169,12 @@ export function chat(
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
 
-          for (const line of lines) {
+          while (buffer.includes('\n')) {
+            const newlineIndex = buffer.indexOf('\n');
+            const line = buffer.slice(0, newlineIndex);
+            buffer = buffer.slice(newlineIndex + 1);
+
             if (line.startsWith('data: ')) {
               try {
                 const chunk: ChatChunk = JSON.parse(line.slice(6));
@@ -190,6 +192,22 @@ export function chat(
               }
             }
           }
+        }
+
+        if (buffer.startsWith('data: ')) {
+          try {
+            const chunk: ChatChunk = JSON.parse(buffer.slice(6));
+            if (chunk.type === 'chunk' && chunk.content) {
+              onChunk(chunk.content);
+            } else if (chunk.type === 'done') {
+              onDone();
+              return;
+            } else if (chunk.type === 'error' && chunk.error) {
+              onError(chunk.error);
+              return;
+            }
+          /* eslint-disable no-empty */ } catch { }
+          /* eslint-enable no-empty */
         }
       } finally {
         reader.releaseLock();

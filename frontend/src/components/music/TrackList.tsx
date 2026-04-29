@@ -23,6 +23,7 @@ export interface Track {
   artist: string;
   coverUrl: string;
   duration: number;
+  url?: string;
 }
 
 interface TrackListProps {

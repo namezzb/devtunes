@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from '../ui/Slider';
 import { Button } from '../ui/Button';
@@ -22,33 +22,31 @@ export function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(80);
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [playlist, setPlaylist] = useState<Track[]>(MOCK_TRACKS);
   const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
   const [clickEffect, setClickEffect] = useState<{x: number, y: number, id: number} | null>(null);
 
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(80);
 
   const displayTracks = tracks.length > 0 ? tracks : playlist;
 
-  useEffect(() => {
-    if (displayTracks.length > 0 && !currentTrack) {
-      setCurrentTrack(displayTracks[0]);
-    }
-  }, [displayTracks, currentTrack]);
+  const getInitialTrack = () => displayTracks.length > 0 ? displayTracks[0] : null;
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(getInitialTrack);
 
-  const toggleMute = () => {
-    if (isMuted) {
-      setVolume(prevVolume);
-      setIsMuted(false);
-    } else {
-      setPrevVolume(volume);
-      setIsMuted(true);
+  useEffect(() => {
+    audioRef.current = audioElement;
+  }, [audioElement]);
+
+  useEffect(() => {
+    if (audioRef.current && currentTrack?.url) {
+      audioRef.current.src = currentTrack.url;
+      audioRef.current.load();
     }
-  };
+  }, [currentTrack]);
 
   const handleNext = useCallback(() => {
     if (!currentTrack) return;
@@ -63,24 +61,68 @@ export function MusicPlayer() {
 
     setCurrentTrack(displayTracks[nextIndex]);
     setProgress(0);
-    setIsPlaying(true);
-  }, [currentTrack, displayTracks, playMode]);
+  }, [currentTrack, displayTracks, playMode, setCurrentTrack]);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isPlaying && currentTrack) {
-      interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= currentTrack.duration) {
-            handleNext();
-            return 0;
-          }
-          return p + 1;
-        });
-      }, 1000);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => {
+      setProgress(audio.currentTime);
+    };
+
+    const handleEnded = () => {
+      handleNext();
+    };
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+    };
+  }, [handleNext]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, currentTrack, handleNext]);
+  }, [volume, isMuted]);
+
+  useEffect(() => {
+    if (audioRef.current && currentTrack?.url) {
+      if (isPlaying) {
+        audioRef.current.play().catch(() => {
+          setIsPlaying(false);
+        });
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying, currentTrack]);
+
+  const toggleMute = () => {
+    if (isMuted) {
+      setVolume(prevVolume);
+      setIsMuted(false);
+    } else {
+      setPrevVolume(volume);
+      setIsMuted(true);
+    }
+  };
 
   const togglePlay = (e: React.MouseEvent) => {
     if (!isPlaying) {
@@ -100,7 +142,13 @@ export function MusicPlayer() {
     const prevIndex = (currentIndex - 1 + displayTracks.length) % displayTracks.length;
     setCurrentTrack(displayTracks[prevIndex]);
     setProgress(0);
-    setIsPlaying(true);
+  };
+
+  const handleProgressChange = (newProgress: number) => {
+    setProgress(newProgress);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newProgress;
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -181,7 +229,7 @@ export function MusicPlayer() {
           <Slider
             value={progress}
             max={currentTrack?.duration || 0}
-            onChange={setProgress}
+            onChange={handleProgressChange}
             formatTooltip={formatTime}
           />
           <div className="flex justify-between text-xs text-[var(--text-muted)] font-mono tracking-wider">
@@ -216,7 +264,7 @@ export function MusicPlayer() {
                   if (v > 0) setIsMuted(false);
                 }}
                 className="w-[120px]"
-                formatTooltip={(v) => `${Math.round(isMuted ? prevVolume : v)}%`}
+                formatTooltip={(v) => `${Math.round(v)}%`}
               />
             </div>
           </div>

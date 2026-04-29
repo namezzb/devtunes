@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { chat, ChatMessage as ApiChatMessage } from '../services/api';
 
 export interface ChatMessage {
@@ -21,6 +21,19 @@ export function useChat(): UseChatReturn {
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortControllerRef = useRef<(() => void) | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current();
+      }
+    };
+  }, []);
 
   const appendMessage = useCallback((role: 'user' | 'agent', content: string): ChatMessage => {
     const newMessage: ChatMessage = {
@@ -56,7 +69,7 @@ export function useChat(): UseChatReturn {
       return [...prev, placeholder];
     });
 
-    const history: ApiChatMessage[] = messages.map(({ role, content }) => ({ role, content }));
+    const history: ApiChatMessage[] = messagesRef.current.map(({ role, content }) => ({ role, content }));
     let fullContent = '';
 
     abortControllerRef.current = chat(
@@ -88,7 +101,7 @@ export function useChat(): UseChatReturn {
         abortControllerRef.current = null;
       }
     );
-  }, [messages, appendMessage]);
+  }, [appendMessage]);
 
   return {
     messages,
