@@ -1,10 +1,11 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, json } from 'express';
 import { spawn } from 'child_process';
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 
 const router = Router();
+router.use(json());
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -39,7 +40,12 @@ router.post('/', async (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 30000);
 
   const claudePath = process.env.CLAUDE_CODE_PATH || '/Users/zhangzibo/.local/bin/claude';
   const prompt = buildPrompt(message, history);
@@ -55,13 +61,20 @@ router.post('/', async (req: Request, res: Response) => {
 
   console.log('claudeEnv ANTHROPIC_AUTH_TOKEN:', claudeEnv.ANTHROPIC_AUTH_TOKEN ? 'set' : 'not set');
 
-  const claude = spawn(claudePath, ['-p', prompt], {
+  const claude = spawn(claudePath, ['-p', '--output-format', 'stream-json', prompt], {
     env: claudeEnv,
   });
 
   claude.stdout.on('data', (data: Buffer) => {
     const text = data.toString();
-    res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.type === 'content' && parsed.content) {
+        res.write(`data: ${JSON.stringify({ type: 'chunk', content: parsed.content })}\n\n`);
+      }
+    } catch {
+      res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
+    }
   });
 
   claude.stderr.on('data', (data: Buffer) => {
@@ -69,6 +82,7 @@ router.post('/', async (req: Request, res: Response) => {
   });
 
   claude.on('close', (code) => {
+    clearInterval(heartbeat);
     if (code !== 0) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: `Claude exited with code ${code}` })}\n\n`);
     }
@@ -76,13 +90,10 @@ router.post('/', async (req: Request, res: Response) => {
     res.end();
   });
 
-  claude.on('error', (err) => {
+  claude.on('error', (err: Error) => {
+    clearInterval(heartbeat);
     res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
     res.end();
-  });
-
-  req.on('close', () => {
-    claude.kill();
   });
 });
 

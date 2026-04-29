@@ -11,7 +11,7 @@ export function createApp(): Express {
 
   // Middleware
   app.use(cors());
-  app.use(express.json());
+  // JSON parsing applied per-router for routes that need it
 
   // Health check
   app.get('/health', (_req: Request, res: Response) => {
