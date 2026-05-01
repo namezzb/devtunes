@@ -3,7 +3,7 @@
 **Path:** `frontend/`
 
 ## OVERVIEW
-React + TypeScript + Vite SPA. Cosmic UI with framer-motion animations and Tailwind CSS.
+React + TypeScript + Vite SPA. Cosmic UI with framer-motion animations and Tailwind CSS. Playwright E2E testing.
 
 ## TECH STACK
 | Layer | Tech | Version |
@@ -14,15 +14,18 @@ React + TypeScript + Vite SPA. Cosmic UI with framer-motion animations and Tailw
 | Styling | Tailwind CSS | 3.4 |
 | Animations | framer-motion | 11 |
 | Linting | ESLint (flat) | 9 + typescript-eslint |
+| E2E | Playwright | 1.59 |
+| DnD | @dnd-kit | core + sortable |
 
 ## CONFIG FILES
 | File | Purpose |
 |------|---------|
-| `vite.config.ts` | React plugin only, minimal |
+| `vite.config.ts` | React plugin, /api proxy to localhost:3001 |
 | `tsconfig.json` | ES2020, react-jsx, bundler moduleResolution |
 | `eslint.config.js` | Flat config: @eslint/js + typescript-eslint + react-hooks |
 | `tailwind.config.js` | Default theme, no extensions |
 | `postcss.config.js` | Autoprefixer |
+| `playwright.config.ts` | Chromium + Mobile Safari, HTML reporter |
 
 ## CSS VARIABLES (globals.css)
 ```css
@@ -37,10 +40,32 @@ React + TypeScript + Vite SPA. Cosmic UI with framer-motion animations and Tailw
 
 ## ENTRY POINTS
 - `index.html` - SPA entry
-- `src/main.tsx` - React mount
-- `src/App.tsx` - Root layout (StarField + Aurora background, 2-column grid)
+- `src/main.tsx` - React mount (StrictMode)
+- `src/App.tsx` - Root layout (StarField + Aurora, DesktopView + MobileView)
 
-## NO EXTERNAL SERVICES YET
-- No API calls (mock data only)
+## DIRECTORY STRUCTURE
+```
+src/
+├── components/  # UI components (feature-grouped)
+├── context/     # React context (AppContext)
+├── hooks/       # Custom hooks (useChat, usePlaylist, etc.)
+├── services/    # API client (api.ts)
+├── styles/      # globals.css with CSS vars
+└── utils/       # urlResolver.ts
+```
+
+## API INTEGRATION
+- **Vite proxy** - /api -> localhost:3001 in dev
+- **services/api.ts** - Fetch wrappers for playlist, search, chat streaming, TTS
+- **Mock data** - MOCK_TRACKS, MOCK_MESSAGES as fallback
+
+## E2E TESTING
+- **Location** - `e2e/` directory
+- **Framework** - Playwright
+- **Browsers** - Chromium + Mobile Safari (iPhone 12)
+- **Run** - `npm run test:e2e`
+
+## NOTES
 - No authentication
 - No database (IndexedDB TODO)
+- No Prettier - ESLint only

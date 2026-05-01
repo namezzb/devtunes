@@ -24,6 +24,7 @@ export interface Track {
   coverUrl: string;
   duration: number;
   url?: string;
+  source?: 'local' | 'netease';
 }
 
 interface TrackListProps {

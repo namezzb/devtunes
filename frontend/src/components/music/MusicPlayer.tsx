@@ -9,13 +9,22 @@ import { AudioVisualizer } from '../effects/AudioVisualizer';
 import { MusicParticles } from '../effects/MusicParticles';
 import { toast } from '../ui/Toast';
 import { usePlaylist } from '../../hooks/usePlaylist';
+import { usePlaybackSync } from '../../hooks/usePlaybackSync';
+import { getCachedDemoAudioUrl } from '../../utils/audioGenerator';
 
 const MOCK_TRACKS: Track[] = [
-  { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 214 },
-  { id: '2', title: 'Deep Space', artist: 'Stellar', coverUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=200&auto=format&fit=crop', duration: 186 },
-  { id: '3', title: 'Lofi Coding', artist: 'Dev Beats', coverUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=200&auto=format&fit=crop', duration: 245 },
-  { id: '4', title: 'Synthwave Rider', artist: 'Retro 80s', coverUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop', duration: 198 },
+  { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 6 },
+  { id: '2', title: 'Deep Space', artist: 'Stellar', coverUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=200&auto=format&fit=crop', duration: 6 },
+  { id: '3', title: 'Lofi Coding', artist: 'Dev Beats', coverUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=200&auto=format&fit=crop', duration: 6 },
+  { id: '4', title: 'Synthwave Rider', artist: 'Retro 80s', coverUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop', duration: 6 },
 ];
+
+function buildMockTracks(): Track[] {
+  return MOCK_TRACKS.map((t) => ({
+    ...t,
+    url: getCachedDemoAudioUrl(t.id),
+  }));
+}
 
 export function MusicPlayer() {
   const { playlist: apiPlaylist, tracks, loading, error, importPlaylist } = usePlaylist();
@@ -23,7 +32,7 @@ export function MusicPlayer() {
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(80);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [playlist, setPlaylist] = useState<Track[]>(MOCK_TRACKS);
+  const [playlist, setPlaylist] = useState<Track[]>(() => buildMockTracks());
   const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
   const [clickEffect, setClickEffect] = useState<{x: number, y: number, id: number} | null>(null);
 
@@ -37,16 +46,25 @@ export function MusicPlayer() {
   const getInitialTrack = () => displayTracks.length > 0 ? displayTracks[0] : null;
   const [currentTrack, setCurrentTrack] = useState<Track | null>(getInitialTrack);
 
+  usePlaybackSync({
+    currentTrack,
+    isPlaying,
+    progress,
+    volume,
+    playlist: displayTracks,
+    playMode: playMode === 'random' ? 'shuffle' : 'list',
+  });
+
   useEffect(() => {
     audioRef.current = audioElement;
   }, [audioElement]);
 
   useEffect(() => {
-    if (audioRef.current && currentTrack?.url) {
+    if (audioRef.current && currentTrack?.url && audioRef.current.src !== currentTrack.url) {
       audioRef.current.src = currentTrack.url;
       audioRef.current.load();
     }
-  }, [currentTrack]);
+  }, [currentTrack, audioElement]);
 
   const handleNext = useCallback(() => {
     if (!currentTrack) return;
@@ -83,18 +101,49 @@ export function MusicPlayer() {
       setIsPlaying(false);
     };
 
+    const handleCanPlay = () => {
+      if (!audio.paused && !isPlaying) {
+        setIsPlaying(true);
+      }
+      if (isPlaying && audio.paused) {
+        audio.play().catch(() => {
+          setIsPlaying(false);
+        });
+      }
+    };
+
+    const handleError = () => {
+      const mediaError = audio.error;
+      if (mediaError) {
+        const errorMessages: Record<number, string> = {
+          1: 'Audio loading aborted',
+          2: 'Network error while loading audio',
+          3: 'Audio decoding failed',
+          4: 'Audio source not supported',
+        };
+        console.warn(
+          `Audio error [${mediaError.code}]: ${errorMessages[mediaError.code] || 'Unknown error'}`,
+        );
+      }
+      setIsPlaying(false);
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
     };
-  }, [handleNext]);
+  }, [handleNext, isPlaying]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -102,17 +151,20 @@ export function MusicPlayer() {
     }
   }, [volume, isMuted]);
 
+  // Handle play/pause when isPlaying changes
   useEffect(() => {
     if (audioRef.current && currentTrack?.url) {
       if (isPlaying) {
-        audioRef.current.play().catch(() => {
-          setIsPlaying(false);
-        });
+        if (audioRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          audioRef.current.play().catch(() => {
+            setIsPlaying(false);
+          });
+        }
       } else {
         audioRef.current.pause();
       }
     }
-  }, [isPlaying, currentTrack]);
+  }, [isPlaying, currentTrack?.url]);
 
   const toggleMute = () => {
     if (isMuted) {
@@ -145,9 +197,12 @@ export function MusicPlayer() {
   };
 
   const handleProgressChange = (newProgress: number) => {
-    setProgress(newProgress);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newProgress;
+    const duration = currentTrack?.duration || 0;
+    const safeMax = Math.max(0, duration - 0.5);
+    const clamped = Math.min(newProgress, safeMax);
+    setProgress(clamped);
+    if (audioRef.current && audioRef.current.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      audioRef.current.currentTime = clamped;
     }
   };
 
@@ -343,6 +398,16 @@ export function MusicPlayer() {
           await importPlaylist(url);
           setIsImportOpen(false);
           toast.success('歌单导入成功');
+        }}
+        onImportLocalTracks={(localTracks) => {
+          setPlaylist(localTracks);
+          if (localTracks.length > 0) {
+            setCurrentTrack(localTracks[0]);
+            setProgress(0);
+            setIsPlaying(true);
+          }
+          setIsImportOpen(false);
+          toast.success(`已导入 ${localTracks.length} 首本地音乐`);
         }}
       />
     </div>

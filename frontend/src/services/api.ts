@@ -18,6 +18,19 @@ export interface Track {
   coverUrl: string;
   duration: number;
   url?: string;
+  source?: 'local' | 'netease';
+}
+
+export interface PlaybackState {
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  progress: number;
+  duration: number;
+  volume: number;
+  playlist: Track[];
+  currentIndex: number;
+  playMode: 'list' | 'shuffle' | 'repeat';
+  timestamp: number;
 }
 
 export interface PlaylistTracks {
@@ -85,14 +98,15 @@ function transformPlaylist(raw: BackendPlaylist): Playlist {
   };
 }
 
-function transformTrack(raw: BackendTrack & { url?: string }): Track {
+function transformTrack(raw: BackendTrack & { url?: string; source?: string }): Track {
   return {
     id: String(raw.id),
     title: raw.name,
     artist: raw.artists?.map(a => a.name).join(', ') || 'Unknown',
     coverUrl: raw.album?.picUrl || '',
-    duration: Math.floor((raw.duration || 0) / 1000), // ms to seconds
+    duration: Math.floor((raw.duration || 0) / 1000),
     url: raw.url,
+    source: (raw.source as 'local' | 'netease') || 'netease',
   };
 }
 
@@ -239,4 +253,40 @@ export async function textToSpeech(text: string, voiceId: string): Promise<Blob>
   }
 
   return response.blob();
+}
+
+export async function getPlayerState(): Promise<PlaybackState> {
+  const data = await apiFetch<{ success: boolean; data: PlaybackState }>('/api/player/state');
+  return data.data;
+}
+
+export async function updatePlayerState(partial: Partial<PlaybackState>): Promise<PlaybackState> {
+  const data = await apiFetch<{ success: boolean; data: PlaybackState }>('/api/player/state', {
+    method: 'PATCH',
+    body: JSON.stringify(partial),
+  });
+  return data.data;
+}
+
+export async function playerAction(
+  action: 'play' | 'pause' | 'next' | 'prev' | 'seek',
+  payload?: { position?: number }
+): Promise<PlaybackState> {
+  const data = await apiFetch<{ success: boolean; data: PlaybackState }>('/api/player/action', {
+    method: 'POST',
+    body: JSON.stringify({ action, payload }),
+  });
+  return data.data;
+}
+
+export async function scanLibrary(): Promise<{ trackCount: number; tracks: Track[] }> {
+  const data = await apiFetch<{ success: boolean; data: { trackCount: number; tracks: Track[] } }>('/api/library/scan', {
+    method: 'POST',
+  });
+  return data.data;
+}
+
+export async function getLocalTracks(): Promise<Track[]> {
+  const data = await apiFetch<{ success: boolean; data: Track[] }>('/api/library');
+  return data.data;
 }

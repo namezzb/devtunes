@@ -5,13 +5,15 @@ import songRouter from './routes/song.js';
 import searchRouter from './routes/search.js';
 import chatRouter from './routes/chat.js';
 import ttsRouter from './routes/tts.js';
+import playerRouter from './routes/player.js';
+import libraryRouter from './routes/library.js';
 
 export function createApp(): Express {
   const app = express();
 
   // Middleware
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
 
   // Health check
   app.get('/health', (_req: Request, res: Response) => {
@@ -24,6 +26,8 @@ export function createApp(): Express {
   app.use('/api/search', searchRouter);
   app.use('/api/chat', chatRouter);
   app.use('/api/tts', ttsRouter);
+  app.use('/api/player', playerRouter);
+  app.use('/api/library', libraryRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {
