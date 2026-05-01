@@ -15,12 +15,14 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "framer-motion": "^11.0.8",
+    "howler": "^2.2.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sonner": "^2.0.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "@types/howler": "^2.2.12",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@typescript-eslint/eslint-plugin": "^8.59.1",
