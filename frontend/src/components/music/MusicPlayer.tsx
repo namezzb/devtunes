@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from '../ui/Slider';
 import { Button } from '../ui/Button';
@@ -40,6 +40,12 @@ export function MusicPlayer() {
   const currentTrack = state.currentTrack || (displayTracks.length > 0 ? displayTracks[0] : null);
   const isPlaying = state.status === 'playing';
 
+  useEffect(() => {
+    if (displayTracks.length > 0) {
+      loadTrack(displayTracks[0], false);
+    }
+  }, []);
+
   usePlaybackSync({
     currentTrack,
     isPlaying,
@@ -62,6 +68,15 @@ export function MusicPlayer() {
       loadTrack(prev, true);
     }
   }, [displayTracks, currentTrack, prevTrack, loadTrack]);
+
+  const prevStatusRef = useRef(state.status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== 'idle' && state.status === 'idle' && state.currentTrack) {
+      handleNext();
+    }
+    prevStatusRef.current = state.status;
+  }, [state.status, state.currentTrack, handleNext]);
 
   const handleTrackSelect = useCallback(
     (track: Track) => {

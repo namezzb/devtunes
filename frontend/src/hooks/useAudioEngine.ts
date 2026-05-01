@@ -173,6 +173,7 @@ export function useAudioEngine(): UseAudioEngineReturn {
       const howl = new Howl({
         src: [track.url],
         html5: true,
+        format: ['wav', 'mp3'],
         preload: 'metadata' as 'metadata',
         volume: state.volume / 100,
         onload: () => {
@@ -180,9 +181,6 @@ export function useAudioEngine(): UseAudioEngineReturn {
           extractAudioNode();
           const duration = howl.duration();
           dispatch({ type: 'LOADED', duration });
-          if (autoPlay) {
-            howl.play();
-          }
         },
         onloaderror: (_id: number, errorCode: unknown) => {
           if (loadIdRef.current !== thisLoadId) return;
@@ -211,6 +209,10 @@ export function useAudioEngine(): UseAudioEngineReturn {
 
       howlRef.current = howl;
       extractAudioNode();
+
+      if (autoPlay) {
+        howl.play();
+      }
     },
     [state.volume, extractAudioNode, startProgressLoop, stopProgressLoop],
   );
