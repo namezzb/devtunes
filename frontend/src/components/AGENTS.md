@@ -8,7 +8,8 @@ components/
 ├── agent/      # AI chat (3 files)
 ├── effects/    # Visual particles (5 files)
 ├── music/      # Player UI (3 files)
-└── ui/         # Primitives (5 files)
+├── ui/         # Primitives (5 files)
+└── widget/     # Clock & Weather (5 files)
 ```
 
 ## EXPORT PATTERN
@@ -35,6 +36,10 @@ Exception: `App.tsx` uses default export
 | Slider | `ui/Slider.tsx` | Range input with progress fill |
 | Toast | `ui/Toast.tsx` | Sonner toast provider |
 | TabNavigation | `ui/TabNavigation.tsx` | Mobile bottom nav + DesktopView/MobileView |
+| ClockWidget | `widget/ClockWidget.tsx` | Digital clock with aurora gradient |
+| WeatherWidget | `widget/WeatherWidget.tsx` | Current weather with glassmorphism |
+| WeatherForecast | `widget/WeatherForecast.tsx` | 5-day forecast strip |
+| ClockWeatherPanel | `widget/ClockWeatherPanel.tsx` | Combined clock + weather container |
 
 ## CONVENTIONS
 - All use Tailwind classes (no CSS modules)
@@ -56,3 +61,5 @@ function Component({ prop1, prop2 }: { prop1: string; prop2?: number })
 ## MOCK DATA
 - `MOCK_TRACKS` in MusicPlayer.tsx
 - `MOCK_MESSAGES` in AgentChat.tsx
+- `MOCK_WEATHER` in useWeather.ts
+- `MOCK_FORECAST` in WeatherForecast.tsx
