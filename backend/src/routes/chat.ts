@@ -1,31 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { spawn } from 'child_process';
-import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 
 const router = Router();
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-}
-
-function loadClaudeSettings() {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  console.log('Loading settings from:', settingsPath);
-  console.log('Exists:', existsSync(settingsPath));
-  if (existsSync(settingsPath)) {
-    try {
-      const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-      console.log('Settings env:', settings.env);
-      return settings.env || {};
-    } catch (e) {
-      console.log('Error parsing settings:', e);
-      return {};
-    }
-  }
-  return {};
 }
 
 router.post('/', async (req: Request, res: Response) => {
@@ -41,49 +21,68 @@ router.post('/', async (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const claudePath = process.env.CLAUDE_CODE_PATH || '/Users/zhangzibo/.local/bin/claude';
   const prompt = buildPrompt(message, history);
-  const claudeSettings = loadClaudeSettings();
 
-  const claudeEnv = {
-    ...process.env,
-    NO_COLOR: '1',
-    PATH: process.env.PATH + ':/Users/zhangzibo/.local/bin',
-    ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || claudeSettings.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic',
-    ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN || claudeSettings.ANTHROPIC_AUTH_TOKEN,
-  };
+  try {
+    for await (const msg of query({
+      prompt,
+      options: {
+        includePartialMessages: true,
+        permissionMode: 'bypassPermissions',
+        maxTurns: 2,
+        maxBudgetUsd: 0.5,
+        settingSources: ['project'],
+      },
+    })) {
+      if (msg.type === 'system' && msg.subtype === 'init') {
+        res.write(`data: ${JSON.stringify({ type: 'init', sessionId: msg.session_id, model: msg.model })}\n\n`);
+        continue;
+      }
 
-  console.log('claudeEnv ANTHROPIC_AUTH_TOKEN:', claudeEnv.ANTHROPIC_AUTH_TOKEN ? 'set' : 'not set');
+      if (msg.type === 'stream_event') {
+        const event = msg.event as { type?: string; delta?: { type?: string; text?: string; thinking?: string } };
 
-  const claude = spawn(claudePath, ['-p', prompt], {
-    env: claudeEnv,
-  });
+        if (event.type === 'content_block_delta' && event.delta) {
+          if (event.delta.type === 'text_delta' && event.delta.text) {
+            res.write(`data: ${JSON.stringify({ type: 'chunk', content: event.delta.text })}\n\n`);
+          } else if (event.delta.type === 'thinking_delta' && event.delta.thinking) {
+            res.write(`data: ${JSON.stringify({ type: 'thinking', content: event.delta.thinking })}\n\n`);
+          }
+        }
+        continue;
+      }
 
-  claude.stdout.on('data', (data: Buffer) => {
-    const text = data.toString();
-    res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
-  });
-
-  claude.stderr.on('data', (data: Buffer) => {
-    console.error('Claude stderr:', data.toString());
-  });
-
-  claude.on('close', (code) => {
-    if (code !== 0) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: `Claude exited with code ${code}` })}\n\n`);
+      if (msg.type === 'result') {
+        if (msg.subtype === 'success') {
+          res.write(`data: ${JSON.stringify({
+            type: 'done',
+            sessionId: msg.session_id,
+            cost: msg.total_cost_usd,
+            turns: msg.num_turns,
+          })}\n\n`);
+        } else {
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            error: msg.subtype,
+            errors: 'errors' in msg ? msg.errors : [],
+          })}\n\n`);
+        }
+        res.end();
+        return;
+      }
     }
+
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
     res.end();
-  });
-
-  claude.on('error', (err) => {
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    res.write(`data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`);
     res.end();
-  });
+  }
 });
 
 function buildPrompt(message: string, history: ChatMessage[]): string {
-  let prompt = 'You are a helpful AI assistant for developers.\n\n';
+  let prompt = '';
 
   for (const msg of history) {
     prompt += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;

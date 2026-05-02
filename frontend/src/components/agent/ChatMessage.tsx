@@ -1,5 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface ChatMessageProps {
   id: string;
@@ -61,16 +64,83 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
               {!isUser && (
                 <div className="absolute inset-0 rounded-2xl rounded-tl-sm border border-transparent bg-gradient-to-br from-[var(--aurora-start)]/30 via-[var(--aurora-mid)]/10 to-[var(--aurora-end)]/30 [mask-image:linear-gradient(white,white)] [-webkit-mask-composite:xor] pointer-events-none" />
               )}
-              
+
               <div className="relative z-10 flex items-start gap-3">
-                <div className="flex-1">{content}</div>
-                
+                <div className="flex-1 min-w-0">
+                  {isUser ? (
+                    content
+                  ) : isError ? (
+                    content
+                  ) : (
+                    <ReactMarkdown
+                      components={{
+                        code({ className, children, ...props }) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          const codeStr = String(children).replace(/\n$/, '');
+                          if (!match) {
+                            return (
+                              <code className="bg-white/10 text-[var(--aurora-start)] px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                                {children}
+                              </code>
+                            );
+                          }
+                          return (
+                            <div className="my-2 rounded-lg overflow-hidden border border-white/10">
+                              <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 text-xs text-[var(--text-muted)] font-mono">
+                                <span>{match[1]}</span>
+                              </div>
+                              <SyntaxHighlighter
+                                style={oneDark}
+                                language={match[1]}
+                                PreTag="div"
+                                customStyle={{
+                                  margin: 0,
+                                  borderRadius: 0,
+                                  background: 'rgba(0,0,0,0.4)',
+                                  fontSize: '0.8rem',
+                                }}
+                              >
+                                {codeStr}
+                              </SyntaxHighlighter>
+                            </div>
+                          );
+                        },
+                        p({ children }) {
+                          return <p className="mb-2 last:mb-0">{children}</p>;
+                        },
+                        ul({ children }) {
+                          return <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>;
+                        },
+                        ol({ children }) {
+                          return <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>;
+                        },
+                        blockquote({ children }) {
+                          return (
+                            <blockquote className="border-l-2 border-[var(--aurora-start)] pl-3 my-2 text-[var(--text-secondary)] italic">
+                              {children}
+                            </blockquote>
+                          );
+                        },
+                        a({ href, children }) {
+                          return (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-[var(--aurora-start)] underline hover:text-[var(--aurora-mid)] transition-colors">
+                              {children}
+                            </a>
+                          );
+                        },
+                      }}
+                    >
+                      {content}
+                    </ReactMarkdown>
+                  )}
+                </div>
+
                 {!isUser && onPlayAudio && (
-                  <button 
+                  <button
                     onClick={() => onPlayAudio(id)}
                     className={`flex-shrink-0 mt-0.5 p-1.5 rounded-full transition-all duration-300 ${
-                      isPlaying 
-                        ? 'text-[var(--aurora-start)] bg-[var(--aurora-start)]/10 shadow-[0_0_10px_rgba(0,255,200,0.2)]' 
+                      isPlaying
+                        ? 'text-[var(--aurora-start)] bg-[var(--aurora-start)]/10 shadow-[0_0_10px_rgba(0,255,200,0.2)]'
                         : 'text-[var(--text-muted)] hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100'
                     }`}
                   >
