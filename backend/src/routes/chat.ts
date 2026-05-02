@@ -1,8 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import path from 'path';
 
 const router = Router();
 
@@ -10,6 +8,8 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
+
+const PROJECT_ROOT = path.resolve(process.cwd(), '..');
 
 const AGENT_SYSTEM_PROMPT = `You are an intelligent AI assistant integrated into DEVTunes, a music + developer productivity web app.
 
@@ -31,22 +31,8 @@ You respond in the user's language (Chinese for Chinese input, English for Engli
 - Use markdown formatting: code blocks for code, lists for enumeration, bold for emphasis
 - Keep responses concise but thorough`;
 
-function loadClaudeSettings(): Record<string, string> {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  if (existsSync(settingsPath)) {
-    try {
-      const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-      return settings.env || {};
-    } catch {
-      return {};
-    }
-  }
-  return {};
-}
-
 router.post('/', async (req: Request, res: Response) => {
   const { message, history = [] }: { message: string; history?: ChatMessage[] } = req.body;
-  const claudeSettings = loadClaudeSettings();
 
   if (!message || message.trim() === '') {
     res.status(400).json({ error: 'Message is required' });
@@ -58,12 +44,6 @@ router.post('/', async (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  Object.assign(process.env, {
-    ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || claudeSettings.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic',
-    ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN || claudeSettings.ANTHROPIC_AUTH_TOKEN,
-    NO_COLOR: '1',
-  });
-
   const prompt = buildPrompt(message, history);
 
   try {
@@ -71,13 +51,13 @@ router.post('/', async (req: Request, res: Response) => {
       prompt,
       options: {
         includePartialMessages: true,
-        cwd: join(homedir(), 'PycharmProjects', 'devtunes'),
+        cwd: PROJECT_ROOT,
         systemPrompt: AGENT_SYSTEM_PROMPT,
         allowedTools: ['Read', 'Grep', 'Glob'],
         permissionMode: 'bypassPermissions',
         maxTurns: 15,
         maxBudgetUsd: 1.0,
-        settingSources: [],
+        settingSources: ['user'],
       },
     })) {
       switch (msg.type) {

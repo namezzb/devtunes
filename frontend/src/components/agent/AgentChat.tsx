@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { useChat } from '../../hooks/useChat';
 
 export function AgentChat() {
-  const { messages, isTyping, sendMessage } = useChat();
+  const { messages, isTyping, sendMessage, toolStatus } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const playingAudioIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -67,6 +67,25 @@ export function AgentChat() {
           </Button>
         </div>
       </div>
+
+      {toolStatus.active && toolStatus.name && (
+        <div className="px-5 py-2 bg-black/20 border-b border-white/5 flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <motion.div
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="w-2 h-2 rounded-full bg-[var(--aurora-start)]"
+            />
+            <span className="text-xs text-[var(--text-secondary)] font-medium">
+              {toolStatus.name === 'Read' && 'Reading files...'}
+              {toolStatus.name === 'Grep' && 'Searching codebase...'}
+              {toolStatus.name === 'Glob' && 'Browsing project...'}
+              {toolStatus.name === 'Bash' && 'Running command...'}
+              {!['Read', 'Grep', 'Glob', 'Bash'].includes(toolStatus.name) && `Using ${toolStatus.name}...`}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar relative z-10">
         <AnimatePresence initial={false}>

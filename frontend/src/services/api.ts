@@ -55,9 +55,10 @@ export interface TtsVoice {
 }
 
 export interface ChatChunk {
-  type: 'chunk' | 'done' | 'error';
+  type: 'chunk' | 'done' | 'error' | 'tool_start' | 'tool_end' | 'thinking';
   content?: string;
   error?: string;
+  name?: string;
 }
 
 // Backend response types (raw from API)
@@ -154,7 +155,9 @@ export function chat(
   history: ChatMessage[],
   onChunk: (content: string) => void,
   onDone: () => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  onToolStart?: (name: string) => void,
+  onToolEnd?: () => void,
 ): () => void {
   const controller = new AbortController();
 
@@ -194,6 +197,10 @@ export function chat(
                 const chunk: ChatChunk = JSON.parse(line.slice(6));
                 if (chunk.type === 'chunk' && chunk.content) {
                   onChunk(chunk.content);
+                } else if (chunk.type === 'tool_start' && chunk.name && onToolStart) {
+                  onToolStart(chunk.name);
+                } else if (chunk.type === 'tool_end' && onToolEnd) {
+                  onToolEnd();
                 } else if (chunk.type === 'done') {
                   onDone();
                   return;
@@ -213,6 +220,10 @@ export function chat(
             const chunk: ChatChunk = JSON.parse(buffer.slice(6));
             if (chunk.type === 'chunk' && chunk.content) {
               onChunk(chunk.content);
+            } else if (chunk.type === 'tool_start' && chunk.name && onToolStart) {
+              onToolStart(chunk.name);
+            } else if (chunk.type === 'tool_end' && onToolEnd) {
+              onToolEnd();
             } else if (chunk.type === 'done') {
               onDone();
               return;

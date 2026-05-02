@@ -8,10 +8,16 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface ToolStatus {
+  active: boolean;
+  name: string | null;
+}
+
 interface UseChatReturn {
   messages: ChatMessage[];
   isTyping: boolean;
   isStreaming: boolean;
+  toolStatus: ToolStatus;
   sendMessage: (content: string) => void;
   appendMessage: (role: 'user' | 'agent', content: string) => ChatMessage;
 }
@@ -20,6 +26,7 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [toolStatus, setToolStatus] = useState<ToolStatus>({ active: false, name: null });
   const abortControllerRef = useRef<(() => void) | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
 
@@ -56,6 +63,7 @@ export function useChat(): UseChatReturn {
 
     setIsTyping(false);
     setIsStreaming(true);
+    setToolStatus({ active: false, name: null });
 
     let agentMessageId: string;
     setMessages((prev) => {
@@ -86,6 +94,7 @@ export function useChat(): UseChatReturn {
       () => {
         setIsStreaming(false);
         setIsTyping(false);
+        setToolStatus({ active: false, name: null });
         abortControllerRef.current = null;
       },
       (errorMsg) => {
@@ -98,8 +107,15 @@ export function useChat(): UseChatReturn {
         );
         setIsStreaming(false);
         setIsTyping(false);
+        setToolStatus({ active: false, name: null });
         abortControllerRef.current = null;
-      }
+      },
+      (toolName) => {
+        setToolStatus({ active: true, name: toolName });
+      },
+      () => {
+        setToolStatus({ active: false, name: null });
+      },
     );
   }, [appendMessage]);
 
@@ -107,6 +123,7 @@ export function useChat(): UseChatReturn {
     messages,
     isTyping,
     isStreaming,
+    toolStatus,
     sendMessage,
     appendMessage,
   };
