@@ -60,6 +60,7 @@ export interface ChatChunk {
   error?: string;
   name?: string;
   sessionId?: string;
+  model?: string;
 }
 
 // Backend response types (raw from API)
@@ -161,13 +162,14 @@ export function chat(
   onThinking?: (content: string) => void,
   onToolStart?: (name: string) => void,
   onToolEnd?: () => void,
+  model?: string,
 ): () => void {
   const controller = new AbortController();
 
   fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, ...(sessionId ? { sessionId } : {}) }),
+    body: JSON.stringify({ message, ...(sessionId ? { sessionId } : {}), ...(model ? { model } : {}) }),
     signal: controller.signal,
   })
     .then(async (response) => {
