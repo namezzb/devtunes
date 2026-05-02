@@ -4,6 +4,8 @@ import path from 'path';
 
 const router = Router();
 
+const SUPPORTED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5'] as const;
+
 const PROJECT_ROOT = path.resolve(process.cwd(), '..');
 
 const AGENT_SYSTEM_PROMPT = `You are an intelligent AI assistant integrated into DEVTunes, a music + developer productivity web app.
@@ -27,10 +29,15 @@ You respond in the user's language (Chinese for Chinese input, English for Engli
 - Keep responses concise but thorough`;
 
 router.post('/', async (req: Request, res: Response) => {
-  const { message, sessionId }: { message: string; sessionId?: string } = req.body;
+  const { message, sessionId, model }: { message: string; sessionId?: string; model?: string } = req.body;
 
   if (!message || message.trim() === '') {
     res.status(400).json({ error: 'Message is required' });
+    return;
+  }
+
+  if (model && !SUPPORTED_MODELS.includes(model as typeof SUPPORTED_MODELS[number])) {
+    res.status(400).json({ error: 'Invalid model. Supported: claude-sonnet-4-6, claude-haiku-4-5' });
     return;
   }
 
@@ -51,6 +58,7 @@ router.post('/', async (req: Request, res: Response) => {
         maxTurns: 15,
         maxBudgetUsd: 1.0,
         settingSources: ['user'],
+        ...(model ? { model } : {}),
         ...(sessionId ? { resume: sessionId } : {}),
       },
     })) {
