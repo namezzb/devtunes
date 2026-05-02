@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { useChat } from '../../hooks/useChat';
 
 export function AgentChat() {
-  const { messages, isTyping, sendMessage, toolStatus } = useChat();
+  const { messages, isTyping, sendMessage, toolStatus, hasSession, newSession } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const playingAudioIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -54,6 +54,14 @@ export function AgentChat() {
           </span>
         </h2>
         <div className="flex gap-2">
+          {hasSession && (
+            <Button variant="ghost" size="sm" onClick={newSession} className="hover:bg-white/10 text-white/70 hover:text-white transition-colors text-xs">
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="hover:bg-white/10 text-white/70 hover:text-white transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

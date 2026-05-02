@@ -4,11 +4,6 @@ import path from 'path';
 
 const router = Router();
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 const PROJECT_ROOT = path.resolve(process.cwd(), '..');
 
 const AGENT_SYSTEM_PROMPT = `You are an intelligent AI assistant integrated into DEVTunes, a music + developer productivity web app.
@@ -32,7 +27,7 @@ You respond in the user's language (Chinese for Chinese input, English for Engli
 - Keep responses concise but thorough`;
 
 router.post('/', async (req: Request, res: Response) => {
-  const { message, history = [] }: { message: string; history?: ChatMessage[] } = req.body;
+  const { message, sessionId }: { message: string; sessionId?: string } = req.body;
 
   if (!message || message.trim() === '') {
     res.status(400).json({ error: 'Message is required' });
@@ -44,11 +39,9 @@ router.post('/', async (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const prompt = buildPrompt(message, history);
-
   try {
     for await (const msg of query({
-      prompt,
+      prompt: message,
       options: {
         includePartialMessages: true,
         cwd: PROJECT_ROOT,
@@ -58,6 +51,7 @@ router.post('/', async (req: Request, res: Response) => {
         maxTurns: 15,
         maxBudgetUsd: 1.0,
         settingSources: ['user'],
+        ...(sessionId ? { resume: sessionId } : {}),
       },
     })) {
       switch (msg.type) {
@@ -119,18 +113,5 @@ router.post('/', async (req: Request, res: Response) => {
     res.end();
   }
 });
-
-function buildPrompt(message: string, history: ChatMessage[]): string {
-  let prompt = '';
-
-  for (const msg of history) {
-    prompt += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
-  }
-
-  prompt += `User: ${message}\n`;
-  prompt += 'Assistant: ';
-
-  return prompt;
-}
 
 export default router;

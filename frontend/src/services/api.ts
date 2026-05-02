@@ -55,10 +55,11 @@ export interface TtsVoice {
 }
 
 export interface ChatChunk {
-  type: 'chunk' | 'done' | 'error' | 'tool_start' | 'tool_end' | 'thinking';
+  type: 'chunk' | 'done' | 'error' | 'init' | 'tool_start' | 'tool_end' | 'thinking';
   content?: string;
   error?: string;
   name?: string;
+  sessionId?: string;
 }
 
 // Backend response types (raw from API)
@@ -152,10 +153,11 @@ export async function searchSongs(keyword: string): Promise<SearchResult> {
 
 export function chat(
   message: string,
-  history: ChatMessage[],
+  sessionId: string | null,
   onChunk: (content: string) => void,
   onDone: () => void,
   onError: (error: string) => void,
+  onInit?: (sid: string) => void,
   onToolStart?: (name: string) => void,
   onToolEnd?: () => void,
 ): () => void {
@@ -164,7 +166,7 @@ export function chat(
   fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, ...(sessionId ? { sessionId } : {}) }),
     signal: controller.signal,
   })
     .then(async (response) => {
@@ -197,6 +199,8 @@ export function chat(
                 const chunk: ChatChunk = JSON.parse(line.slice(6));
                 if (chunk.type === 'chunk' && chunk.content) {
                   onChunk(chunk.content);
+                } else if (chunk.type === 'init' && chunk.sessionId && onInit) {
+                  onInit(chunk.sessionId);
                 } else if (chunk.type === 'tool_start' && chunk.name && onToolStart) {
                   onToolStart(chunk.name);
                 } else if (chunk.type === 'tool_end' && onToolEnd) {
