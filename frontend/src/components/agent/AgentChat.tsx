@@ -82,15 +82,16 @@ export function AgentChat() {
             <motion.div
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1, repeat: Infinity }}
-              className="w-2 h-2 rounded-full bg-[var(--aurora-start)]"
+              className="w-2 h-2 rounded-full bg-[var(--aurora-start)] flex-shrink-0"
             />
-            <span className="text-xs text-[var(--text-secondary)] font-medium">
-              {toolStatus.name === 'Thinking...' && 'Agent is thinking...'}
-              {toolStatus.name === 'Read' && 'Reading files...'}
-              {toolStatus.name === 'Grep' && 'Searching codebase...'}
-              {toolStatus.name === 'Glob' && 'Browsing project...'}
-              {toolStatus.name === 'Bash' && 'Running command...'}
-              {!['Thinking...', 'Read', 'Grep', 'Glob', 'Bash'].includes(toolStatus.name) && `Using ${toolStatus.name}...`}
+            <span className="text-xs text-[var(--text-secondary)] truncate max-w-full">
+              {toolStatus.name.startsWith('The ') || toolStatus.name.startsWith('用户') || toolStatus.name.includes(' is') || toolStatus.name.includes('需要') || toolStatus.name.length > 30
+                ? toolStatus.name
+                : toolStatus.name === 'Read' ? 'Reading files...'
+                : toolStatus.name === 'Grep' ? 'Searching codebase...'
+                : toolStatus.name === 'Glob' ? 'Browsing project...'
+                : toolStatus.name === 'Bash' ? 'Running command...'
+                : `Using ${toolStatus.name}...`}
             </span>
           </div>
         </div>

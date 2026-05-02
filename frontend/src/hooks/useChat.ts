@@ -86,6 +86,7 @@ export function useChat(): UseChatReturn {
     });
 
     let fullContent = '';
+    let thinkingAccum = '';
 
     abortControllerRef.current = chat(
       content,
@@ -121,7 +122,8 @@ export function useChat(): UseChatReturn {
         setSessionId(sid);
       },
       (thinking) => {
-        setToolStatus({ active: true, name: 'Thinking...' });
+        thinkingAccum += thinking;
+        setToolStatus({ active: true, name: thinkingAccum });
       },
       (toolName) => {
         setToolStatus({ active: true, name: toolName });
