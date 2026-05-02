@@ -85,11 +85,12 @@ export function AgentChat() {
               className="w-2 h-2 rounded-full bg-[var(--aurora-start)]"
             />
             <span className="text-xs text-[var(--text-secondary)] font-medium">
+              {toolStatus.name === 'Thinking...' && 'Agent is thinking...'}
               {toolStatus.name === 'Read' && 'Reading files...'}
               {toolStatus.name === 'Grep' && 'Searching codebase...'}
               {toolStatus.name === 'Glob' && 'Browsing project...'}
               {toolStatus.name === 'Bash' && 'Running command...'}
-              {!['Read', 'Grep', 'Glob', 'Bash'].includes(toolStatus.name) && `Using ${toolStatus.name}...`}
+              {!['Thinking...', 'Read', 'Grep', 'Glob', 'Bash'].includes(toolStatus.name) && `Using ${toolStatus.name}...`}
             </span>
           </div>
         </div>

@@ -158,6 +158,7 @@ export function chat(
   onDone: () => void,
   onError: (error: string) => void,
   onInit?: (sid: string) => void,
+  onThinking?: (content: string) => void,
   onToolStart?: (name: string) => void,
   onToolEnd?: () => void,
 ): () => void {
@@ -197,9 +198,11 @@ export function chat(
             if (line.startsWith('data: ')) {
               try {
                 const chunk: ChatChunk = JSON.parse(line.slice(6));
-                if (chunk.type === 'chunk' && chunk.content) {
-                  onChunk(chunk.content);
-                } else if (chunk.type === 'init' && chunk.sessionId && onInit) {
+            if (chunk.type === 'chunk' && chunk.content) {
+              onChunk(chunk.content);
+            } else if (chunk.type === 'thinking' && chunk.content && onThinking) {
+              onThinking(chunk.content);
+            } else if (chunk.type === 'init' && chunk.sessionId && onInit) {
                   onInit(chunk.sessionId);
                 } else if (chunk.type === 'tool_start' && chunk.name && onToolStart) {
                   onToolStart(chunk.name);

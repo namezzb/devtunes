@@ -120,6 +120,9 @@ export function useChat(): UseChatReturn {
       (sid) => {
         setSessionId(sid);
       },
+      (thinking) => {
+        setToolStatus({ active: true, name: 'Thinking...' });
+      },
       (toolName) => {
         setToolStatus({ active: true, name: toolName });
       },
