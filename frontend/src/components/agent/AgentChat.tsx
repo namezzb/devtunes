@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { useChat } from '../../hooks/useChat';
 
 export function AgentChat() {
-  const { messages, isTyping, sendMessage, toolStatus, hasSession, newSession } = useChat();
+  const { messages, isTyping, isStreaming, sendMessage, toolStatus, hasSession, newSession, thinkingMode, toggleThinking } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const playingAudioIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,6 +52,13 @@ export function AgentChat() {
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
             AI Agent
           </span>
+          <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${
+            thinkingMode 
+              ? 'border-[var(--aurora-start)]/40 text-[var(--aurora-start)] bg-[var(--aurora-start)]/10' 
+              : 'border-white/10 text-[var(--text-secondary)] bg-white/5'
+          }`}>
+            {thinkingMode ? '思考模式' : '快速模式'}
+          </span>
         </h2>
         <div className="flex gap-2">
           {hasSession && (
@@ -77,7 +84,7 @@ export function AgentChat() {
       </div>
 
       {toolStatus.active && toolStatus.name && (
-        <div className="px-5 py-2 bg-black/20 border-b border-white/5 flex items-center gap-2">
+        <div className="px-5 py-2 bg-black/20 border-b border-white/5 flex items-center gap-2 min-w-0 overflow-hidden">
           <div className="flex items-center gap-1.5">
             <motion.div
               animate={{ opacity: [0.4, 1, 0.4] }}
@@ -159,7 +166,13 @@ export function AgentChat() {
       </div>
 
       <div className="relative z-10 bg-black/20 backdrop-blur-md border-t border-white/5">
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInput 
+              onSend={handleSend} 
+              disabled={isTyping} 
+              thinkingMode={thinkingMode}
+              onToggleThinking={toggleThinking}
+              isStreaming={isStreaming}
+            />
       </div>
     </div>
   );

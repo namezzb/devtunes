@@ -79,7 +79,7 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                           const codeStr = String(children).replace(/\n$/, '');
                           if (!match) {
                             return (
-                              <code className="bg-white/10 text-[var(--aurora-start)] px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                              <code className="bg-white/10 text-[var(--aurora-start)] px-1.5 py-0.5 rounded text-xs font-mono break-all" {...props}>
                                 {children}
                               </code>
                             );
@@ -98,6 +98,9 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                                   borderRadius: 0,
                                   background: 'rgba(0,0,0,0.4)',
                                   fontSize: '0.8rem',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-all',
+                                  overflowWrap: 'break-word',
                                 }}
                               >
                                 {codeStr}
@@ -105,8 +108,11 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                             </div>
                           );
                         },
+                        pre({ children }) {
+                          return <pre className="overflow-x-auto whitespace-pre-wrap break-words">{children}</pre>;
+                        },
                         p({ children }) {
-                          return <p className="mb-2 last:mb-0">{children}</p>;
+                          return <p className="mb-2 last:mb-0 break-words">{children}</p>;
                         },
                         ul({ children }) {
                           return <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>;

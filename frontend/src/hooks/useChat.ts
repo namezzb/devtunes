@@ -1,6 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { chat } from '../services/api';
 
+const THINKING_MODEL = 'claude-sonnet-4-6';
+const FAST_MODEL = 'claude-haiku-4-5';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'agent';
@@ -19,8 +22,10 @@ interface UseChatReturn {
   isStreaming: boolean;
   toolStatus: ToolStatus;
   hasSession: boolean;
+  thinkingMode: boolean;
   sendMessage: (content: string) => void;
   newSession: () => void;
+  toggleThinking: () => void;
   appendMessage: (role: 'user' | 'agent', content: string) => ChatMessage;
 }
 
@@ -30,6 +35,7 @@ export function useChat(): UseChatReturn {
   const [isStreaming, setIsStreaming] = useState(false);
   const [toolStatus, setToolStatus] = useState<ToolStatus>({ active: false, name: null });
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [thinkingMode, setThinkingMode] = useState(true);
   const abortControllerRef = useRef<(() => void) | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
@@ -41,6 +47,11 @@ export function useChat(): UseChatReturn {
     setSessionId(null);
     setMessages([]);
   }, []);
+
+  const toggleThinking = useCallback(() => {
+    setThinkingMode((prev) => !prev);
+    newSession();
+  }, [newSession]);
 
   useEffect(() => {
     return () => {
@@ -131,8 +142,9 @@ export function useChat(): UseChatReturn {
       () => {
         setToolStatus({ active: false, name: null });
       },
+      thinkingMode ? THINKING_MODEL : FAST_MODEL,
     );
-  }, [appendMessage]);
+  }, [appendMessage, thinkingMode]);
 
   return {
     messages,
@@ -140,8 +152,10 @@ export function useChat(): UseChatReturn {
     isStreaming,
     toolStatus,
     hasSession: sessionId !== null,
+    thinkingMode,
     sendMessage,
     newSession,
+    toggleThinking,
     appendMessage,
   };
 }
