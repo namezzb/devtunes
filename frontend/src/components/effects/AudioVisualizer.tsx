@@ -7,36 +7,58 @@ interface AudioVisualizerProps {
 
 export function AudioVisualizer({ isPlaying, audioElement }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const previousElementRef = useRef<HTMLAudioElement | null>(null);
+  const analyzerRef = useRef<AnalyserNode | null>(null);
 
   useEffect(() => {
     if (!audioElement || !isPlaying) {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = 0;
       }
       return;
     }
 
-    let audioContext: AudioContext;
-    let analyzer: AnalyserNode;
-    let dataArray: Uint8Array<ArrayBuffer>;
-
-    try {
-      audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    let audioContext = audioContextRef.current;
+    if (!audioContext) {
+      audioContext = new AudioContext();
       audioContextRef.current = audioContext;
-      analyzer = audioContext.createAnalyser();
-      analyzer.fftSize = 128;
+    }
 
-      const source = audioContext.createMediaElementSource(audioElement);
+    if (previousElementRef.current !== audioElement) {
+      if (sourceRef.current) {
+        try {
+          sourceRef.current.disconnect();
+        } catch {
+          /* already disconnected */
+        }
+        sourceRef.current = null;
+      }
+      previousElementRef.current = audioElement;
+    }
+
+    if (!sourceRef.current) {
+      try {
+        sourceRef.current = audioContext.createMediaElementSource(audioElement);
+      } catch (e) {
+        console.warn('AudioVisualizer: could not connect to audio element', e);
+        return;
+      }
+    }
+
+    const source = sourceRef.current;
+    const analyzer = analyzerRef.current || audioContext.createAnalyser();
+    if (!analyzerRef.current) {
+      analyzer.fftSize = 128;
+      analyzerRef.current = analyzer;
       source.connect(analyzer);
       analyzer.connect(audioContext.destination);
-
-      dataArray = new Uint8Array(analyzer.frequencyBinCount);
-    } catch {
-      console.warn("Audio context already created or failed to create");
-      return;
     }
+
+    const dataArray = new Uint8Array(analyzer.frequencyBinCount);
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -92,10 +114,7 @@ export function AudioVisualizer({ isPlaying, audioElement }: AudioVisualizerProp
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
+        animationRef.current = 0;
       }
     };
   }, [isPlaying, audioElement]);

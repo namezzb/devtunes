@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from '../ui/Slider';
 import { Button } from '../ui/Button';
@@ -9,146 +9,100 @@ import { AudioVisualizer } from '../effects/AudioVisualizer';
 import { MusicParticles } from '../effects/MusicParticles';
 import { toast } from '../ui/Toast';
 import { usePlaylist } from '../../hooks/usePlaylist';
+import { usePlaybackSync } from '../../hooks/usePlaybackSync';
+import { useAudioEngine } from '../../hooks/useAudioEngine';
+import { getCachedDemoAudioUrl } from '../../utils/audioGenerator';
 
 const MOCK_TRACKS: Track[] = [
-  { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 214 },
-  { id: '2', title: 'Deep Space', artist: 'Stellar', coverUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=200&auto=format&fit=crop', duration: 186 },
-  { id: '3', title: 'Lofi Coding', artist: 'Dev Beats', coverUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=200&auto=format&fit=crop', duration: 245 },
-  { id: '4', title: 'Synthwave Rider', artist: 'Retro 80s', coverUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop', duration: 198 },
+  { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 6 },
+  { id: '2', title: 'Deep Space', artist: 'Stellar', coverUrl: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=200&auto=format&fit=crop', duration: 6 },
+  { id: '3', title: 'Lofi Coding', artist: 'Dev Beats', coverUrl: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?q=80&w=200&auto=format&fit=crop', duration: 6 },
+  { id: '4', title: 'Synthwave Rider', artist: 'Retro 80s', coverUrl: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=200&auto=format&fit=crop', duration: 6 },
 ];
+
+function buildMockTracks(): Track[] {
+  return MOCK_TRACKS.map((t) => ({
+    ...t,
+    url: getCachedDemoAudioUrl(t.id),
+  }));
+}
 
 export function MusicPlayer() {
   const { playlist: apiPlaylist, tracks, loading, error, importPlaylist } = usePlaylist();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(80);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [playlist, setPlaylist] = useState<Track[]>(MOCK_TRACKS);
-  const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
-  const [clickEffect, setClickEffect] = useState<{x: number, y: number, id: number} | null>(null);
+  const { state, loadTrack, togglePlay, seek, setVolume, toggleMute, nextTrack, prevTrack, audioNode } = useAudioEngine();
 
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [prevVolume, setPrevVolume] = useState(80);
+  const [playlist, setPlaylist] = useState<Track[]>(() => buildMockTracks());
+  const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [clickEffect, setClickEffect] = useState<{ x: number; y: number; id: number } | null>(null);
 
   const displayTracks = tracks.length > 0 ? tracks : playlist;
-
-  const getInitialTrack = () => displayTracks.length > 0 ? displayTracks[0] : null;
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(getInitialTrack);
-
-  useEffect(() => {
-    audioRef.current = audioElement;
-  }, [audioElement]);
+  const currentTrack = state.currentTrack || (displayTracks.length > 0 ? displayTracks[0] : null);
+  const isPlaying = state.status === 'playing';
 
   useEffect(() => {
-    if (audioRef.current && currentTrack?.url) {
-      audioRef.current.src = currentTrack.url;
-      audioRef.current.load();
+    if (displayTracks.length > 0) {
+      loadTrack(displayTracks[0], false);
     }
-  }, [currentTrack]);
+  }, []);
+
+  usePlaybackSync({
+    currentTrack,
+    isPlaying,
+    progress: state.position,
+    volume: state.volume,
+    playlist: displayTracks,
+    playMode: playMode === 'random' ? 'shuffle' : 'list',
+  });
 
   const handleNext = useCallback(() => {
-    if (!currentTrack) return;
-    const currentIndex = displayTracks.findIndex(t => t.id === currentTrack.id);
-    let nextIndex;
-
-    if (playMode === 'random') {
-      nextIndex = Math.floor(Math.random() * displayTracks.length);
-    } else {
-      nextIndex = (currentIndex + 1) % displayTracks.length;
+    const next = nextTrack(displayTracks, currentTrack?.id || '', playMode);
+    if (next) {
+      loadTrack(next, true);
     }
+  }, [displayTracks, currentTrack, playMode, nextTrack, loadTrack]);
 
-    setCurrentTrack(displayTracks[nextIndex]);
-    setProgress(0);
-  }, [currentTrack, displayTracks, playMode, setCurrentTrack]);
+  const handlePrev = useCallback(() => {
+    const prev = prevTrack(displayTracks, currentTrack?.id || '');
+    if (prev) {
+      loadTrack(prev, true);
+    }
+  }, [displayTracks, currentTrack, prevTrack, loadTrack]);
+
+  const prevStatusRef = useRef(state.status);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handleTimeUpdate = () => {
-      setProgress(audio.currentTime);
-    };
-
-    const handleEnded = () => {
+    if (prevStatusRef.current !== 'idle' && state.status === 'idle' && state.currentTrack) {
       handleNext();
-    };
-
-    const handlePlay = () => {
-      setIsPlaying(true);
-    };
-
-    const handlePause = () => {
-      setIsPlaying(false);
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-    };
-  }, [handleNext]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
-  }, [volume, isMuted]);
+    prevStatusRef.current = state.status;
+  }, [state.status, state.currentTrack, handleNext]);
 
-  useEffect(() => {
-    if (audioRef.current && currentTrack?.url) {
-      if (isPlaying) {
-        audioRef.current.play().catch(() => {
-          setIsPlaying(false);
-        });
-      } else {
-        audioRef.current.pause();
-      }
-    }
-  }, [isPlaying, currentTrack]);
+  const handleTrackSelect = useCallback(
+    (track: Track) => {
+      loadTrack(track, true);
+    },
+    [loadTrack],
+  );
 
-  const toggleMute = () => {
-    if (isMuted) {
-      setVolume(prevVolume);
-      setIsMuted(false);
-    } else {
-      setPrevVolume(volume);
-      setIsMuted(true);
-    }
+  const handleProgressChange = (newProgress: number) => {
+    seek(newProgress);
   };
 
-  const togglePlay = (e: React.MouseEvent) => {
+  const handleVolumeChange = (v: number) => {
+    setVolume(v);
+  };
+
+  const handleTogglePlay = (e: React.MouseEvent) => {
     if (!isPlaying) {
       const rect = e.currentTarget.getBoundingClientRect();
       setClickEffect({
         x: rect.width / 2,
         y: rect.height / 2,
-        id: Date.now()
+        id: Date.now(),
       });
     }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handlePrev = () => {
-    if (!currentTrack) return;
-    const currentIndex = displayTracks.findIndex(t => t.id === currentTrack.id);
-    const prevIndex = (currentIndex - 1 + displayTracks.length) % displayTracks.length;
-    setCurrentTrack(displayTracks[prevIndex]);
-    setProgress(0);
-  };
-
-  const handleProgressChange = (newProgress: number) => {
-    setProgress(newProgress);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newProgress;
-    }
+    togglePlay();
   };
 
   const formatTime = (seconds: number) => {
@@ -156,6 +110,27 @@ export function MusicPlayer() {
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  const handleImport = useCallback(
+    async (url: string) => {
+      await importPlaylist(url);
+      setIsImportOpen(false);
+      toast.success('歌单导入成功');
+    },
+    [importPlaylist],
+  );
+
+  const handleImportLocalTracks = useCallback(
+    (localTracks: Track[]) => {
+      setPlaylist(localTracks);
+      if (localTracks.length > 0) {
+        loadTrack(localTracks[0], true);
+      }
+      setIsImportOpen(false);
+      toast.success(`已导入 ${localTracks.length} 首本地音乐`);
+    },
+    [loadTrack],
+  );
 
   return (
     <div className="glass-card flex flex-col h-full overflow-hidden relative z-10 shadow-[0_0_40px_rgba(0,0,0,0.5)] border-white/10">
@@ -182,8 +157,7 @@ export function MusicPlayer() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40 z-10" />
         <MusicParticles isPlaying={isPlaying} />
         <BlackHole isPlaying={isPlaying} />
-        <AudioVisualizer isPlaying={isPlaying} audioElement={audioElement} />
-        <audio ref={setAudioElement} src="" className="hidden" />
+        <AudioVisualizer isPlaying={isPlaying} audioElement={audioNode} />
       </div>
 
       <div className="p-6 bg-black/40 backdrop-blur-xl relative z-10">
@@ -196,11 +170,11 @@ export function MusicPlayer() {
                 className="w-full h-full object-cover"
                 animate={{
                   rotate: isPlaying ? 360 : 0,
-                  scale: isPlaying ? 1.1 : 1
+                  scale: isPlaying ? 1.1 : 1,
                 }}
                 transition={{
-                  rotate: { duration: 20, repeat: Infinity, ease: "linear" },
-                  scale: { duration: 0.5 }
+                  rotate: { duration: 20, repeat: Infinity, ease: 'linear' },
+                  scale: { duration: 0.5 },
                 }}
               />
               {isPlaying && (
@@ -215,7 +189,7 @@ export function MusicPlayer() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setPlayMode(m => m === 'loop' ? 'random' : 'loop')}
+              onClick={() => setPlayMode((m) => (m === 'loop' ? 'random' : 'loop'))}
               className={`p-2 rounded-lg transition-all duration-300 ${playMode === 'random' ? 'text-[var(--aurora-start)] bg-[var(--aurora-start)]/10 shadow-[0_0_15px_rgba(0,255,200,0.2)]' : 'text-[var(--text-muted)] hover:text-white hover:bg-white/5'}`}
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -227,14 +201,14 @@ export function MusicPlayer() {
 
         <div className="space-y-2 mb-6">
           <Slider
-            value={progress}
-            max={currentTrack?.duration || 0}
+            value={state.position}
+            max={state.duration || currentTrack?.duration || 0}
             onChange={handleProgressChange}
             formatTooltip={formatTime}
           />
           <div className="flex justify-between text-xs text-[var(--text-muted)] font-mono tracking-wider">
-            <span>{formatTime(progress)}</span>
-            <span>{formatTime(currentTrack?.duration || 0)}</span>
+            <span>{formatTime(state.position)}</span>
+            <span>{formatTime(state.duration || currentTrack?.duration || 0)}</span>
           </div>
         </div>
 
@@ -243,9 +217,9 @@ export function MusicPlayer() {
             <button
               onClick={toggleMute}
               className="p-1 text-[var(--text-muted)] hover:text-white transition-colors"
-              title={isMuted ? '取消静音' : '静音'}
+              title={state.muted ? '取消静音' : '静音'}
             >
-              {isMuted ? (
+              {state.muted ? (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
@@ -258,11 +232,8 @@ export function MusicPlayer() {
             </button>
             <div className="overflow-hidden transition-all duration-300 ease-out group-hover:w-[120px] w-0">
               <Slider
-                value={isMuted ? 0 : volume}
-                onChange={(v) => {
-                  setVolume(v);
-                  if (v > 0) setIsMuted(false);
-                }}
+                value={state.muted ? 0 : state.volume}
+                onChange={handleVolumeChange}
                 className="w-[120px]"
                 formatTooltip={(v) => `${Math.round(v)}%`}
               />
@@ -278,7 +249,7 @@ export function MusicPlayer() {
 
             <div className="relative">
               <button
-                onClick={togglePlay}
+                onClick={handleTogglePlay}
                 className="relative w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--aurora-start)] to-[var(--aurora-mid)] text-white shadow-[0_0_20px_rgba(0,255,200,0.4)] hover:shadow-[0_0_30px_rgba(0,255,200,0.6)] hover:scale-105 transition-all duration-300 z-10"
               >
                 {isPlaying ? (
@@ -299,7 +270,7 @@ export function MusicPlayer() {
                     initial={{ scale: 1, opacity: 0.8 }}
                     animate={{ scale: 2, opacity: 0 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="absolute inset-0 rounded-full border-2 border-[var(--aurora-start)] pointer-events-none"
                   />
                 )}
@@ -325,11 +296,7 @@ export function MusicPlayer() {
         <TrackList
           tracks={displayTracks}
           currentTrackId={currentTrack?.id || ''}
-          onTrackSelect={(track) => {
-            setCurrentTrack(track);
-            setProgress(0);
-            setIsPlaying(true);
-          }}
+          onTrackSelect={handleTrackSelect}
           onReorder={(newPlaylist) => {
             setPlaylist(newPlaylist);
           }}
@@ -339,11 +306,8 @@ export function MusicPlayer() {
       <PlaylistImport
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        onImport={async (url) => {
-          await importPlaylist(url);
-          setIsImportOpen(false);
-          toast.success('歌单导入成功');
-        }}
+        onImport={handleImport}
+        onImportLocalTracks={handleImportLocalTracks}
       />
     </div>
   );

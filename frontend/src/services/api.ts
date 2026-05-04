@@ -18,6 +18,19 @@ export interface Track {
   coverUrl: string;
   duration: number;
   url?: string;
+  source?: 'local' | 'netease';
+}
+
+export interface PlaybackState {
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  progress: number;
+  duration: number;
+  volume: number;
+  playlist: Track[];
+  currentIndex: number;
+  playMode: 'list' | 'shuffle' | 'repeat';
+  timestamp: number;
 }
 
 export interface PlaylistTracks {
@@ -42,9 +55,12 @@ export interface TtsVoice {
 }
 
 export interface ChatChunk {
-  type: 'chunk' | 'done' | 'error';
+  type: 'chunk' | 'done' | 'error' | 'init' | 'tool_start' | 'tool_end' | 'thinking';
   content?: string;
   error?: string;
+  name?: string;
+  sessionId?: string;
+  model?: string;
 }
 
 // Backend response types (raw from API)
@@ -85,14 +101,15 @@ function transformPlaylist(raw: BackendPlaylist): Playlist {
   };
 }
 
-function transformTrack(raw: BackendTrack & { url?: string }): Track {
+function transformTrack(raw: BackendTrack & { url?: string; source?: string }): Track {
   return {
     id: String(raw.id),
     title: raw.name,
     artist: raw.artists?.map(a => a.name).join(', ') || 'Unknown',
     coverUrl: raw.album?.picUrl || '',
-    duration: Math.floor((raw.duration || 0) / 1000), // ms to seconds
+    duration: Math.floor((raw.duration || 0) / 1000),
     url: raw.url,
+    source: (raw.source as 'local' | 'netease') || 'netease',
   };
 }
 
@@ -137,17 +154,22 @@ export async function searchSongs(keyword: string): Promise<SearchResult> {
 
 export function chat(
   message: string,
-  history: ChatMessage[],
+  sessionId: string | null,
   onChunk: (content: string) => void,
   onDone: () => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  onInit?: (sid: string) => void,
+  onThinking?: (content: string) => void,
+  onToolStart?: (name: string) => void,
+  onToolEnd?: () => void,
+  model?: string,
 ): () => void {
   const controller = new AbortController();
 
   fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, ...(sessionId ? { sessionId } : {}), ...(model ? { model } : {}) }),
     signal: controller.signal,
   })
     .then(async (response) => {
@@ -178,8 +200,16 @@ export function chat(
             if (line.startsWith('data: ')) {
               try {
                 const chunk: ChatChunk = JSON.parse(line.slice(6));
-                if (chunk.type === 'chunk' && chunk.content) {
-                  onChunk(chunk.content);
+            if (chunk.type === 'chunk' && chunk.content) {
+              onChunk(chunk.content);
+            } else if (chunk.type === 'thinking' && chunk.content && onThinking) {
+              onThinking(chunk.content);
+            } else if (chunk.type === 'init' && chunk.sessionId && onInit) {
+                  onInit(chunk.sessionId);
+                } else if (chunk.type === 'tool_start' && chunk.name && onToolStart) {
+                  onToolStart(chunk.name);
+                } else if (chunk.type === 'tool_end' && onToolEnd) {
+                  onToolEnd();
                 } else if (chunk.type === 'done') {
                   onDone();
                   return;
@@ -199,6 +229,10 @@ export function chat(
             const chunk: ChatChunk = JSON.parse(buffer.slice(6));
             if (chunk.type === 'chunk' && chunk.content) {
               onChunk(chunk.content);
+            } else if (chunk.type === 'tool_start' && chunk.name && onToolStart) {
+              onToolStart(chunk.name);
+            } else if (chunk.type === 'tool_end' && onToolEnd) {
+              onToolEnd();
             } else if (chunk.type === 'done') {
               onDone();
               return;
@@ -239,4 +273,40 @@ export async function textToSpeech(text: string, voiceId: string): Promise<Blob>
   }
 
   return response.blob();
+}
+
+export async function getPlayerState(): Promise<PlaybackState> {
+  const data = await apiFetch<{ success: boolean; data: PlaybackState }>('/api/player/state');
+  return data.data;
+}
+
+export async function updatePlayerState(partial: Partial<PlaybackState>): Promise<PlaybackState> {
+  const data = await apiFetch<{ success: boolean; data: PlaybackState }>('/api/player/state', {
+    method: 'PATCH',
+    body: JSON.stringify(partial),
+  });
+  return data.data;
+}
+
+export async function playerAction(
+  action: 'play' | 'pause' | 'next' | 'prev' | 'seek',
+  payload?: { position?: number }
+): Promise<PlaybackState> {
+  const data = await apiFetch<{ success: boolean; data: PlaybackState }>('/api/player/action', {
+    method: 'POST',
+    body: JSON.stringify({ action, payload }),
+  });
+  return data.data;
+}
+
+export async function scanLibrary(): Promise<{ trackCount: number; tracks: Track[] }> {
+  const data = await apiFetch<{ success: boolean; data: { trackCount: number; tracks: Track[] } }>('/api/library/scan', {
+    method: 'POST',
+  });
+  return data.data;
+}
+
+export async function getLocalTracks(): Promise<Track[]> {
+  const data = await apiFetch<{ success: boolean; data: Track[] }>('/api/library');
+  return data.data;
 }

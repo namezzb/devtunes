@@ -45,10 +45,22 @@ npm-debug.log*
 coverage/
 */coverage/
 
-# Backend (future)
-backend/node_modules/
-backend/dist/
-backend/.env
+# Test artifacts
+test-results/
+frontend/test-results/
+frontend/playwright-report/
+
+# Playwright
+.playwright-cli/
+.playwright-mcp/
+
+# Data / local caches
+data/
 
 # Misc
 *.tgz
+
+# Local development
+bugfixes/
+backend/check_path.ts
+frontend/CODE_REVIEW.md

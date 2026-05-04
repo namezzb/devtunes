@@ -1,5 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { chat, ChatMessage as ApiChatMessage } from '../services/api';
+import { chat } from '../services/api';
+
+const THINKING_MODEL = 'claude-sonnet-4-6';
+const FAST_MODEL = 'claude-haiku-4-5';
 
 export interface ChatMessage {
   id: string;
@@ -8,11 +11,21 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface ToolStatus {
+  active: boolean;
+  name: string | null;
+}
+
 interface UseChatReturn {
   messages: ChatMessage[];
   isTyping: boolean;
   isStreaming: boolean;
+  toolStatus: ToolStatus;
+  hasSession: boolean;
+  thinkingMode: boolean;
   sendMessage: (content: string) => void;
+  newSession: () => void;
+  toggleThinking: () => void;
   appendMessage: (role: 'user' | 'agent', content: string) => ChatMessage;
 }
 
@@ -20,12 +33,25 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [toolStatus, setToolStatus] = useState<ToolStatus>({ active: false, name: null });
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [thinkingMode, setThinkingMode] = useState(true);
   const abortControllerRef = useRef<(() => void) | null>(null);
-  const messagesRef = useRef<ChatMessage[]>([]);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  const newSession = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+  }, []);
+
+  const toggleThinking = useCallback(() => {
+    setThinkingMode((prev) => !prev);
+    newSession();
+  }, [newSession]);
 
   useEffect(() => {
     return () => {
@@ -56,6 +82,7 @@ export function useChat(): UseChatReturn {
 
     setIsTyping(false);
     setIsStreaming(true);
+    setToolStatus({ active: false, name: null });
 
     let agentMessageId: string;
     setMessages((prev) => {
@@ -69,8 +96,8 @@ export function useChat(): UseChatReturn {
       return [...prev, placeholder];
     });
 
-    const history: ApiChatMessage[] = messagesRef.current.map(({ role, content }) => ({ role, content }));
     let fullContent = '';
+    let thinkingAccum = '';
 
     let pendingUpdate = false;
 
@@ -92,7 +119,7 @@ export function useChat(): UseChatReturn {
 
     abortControllerRef.current = chat(
       content,
-      history,
+      sessionIdRef.current,
       (chunk) => {
         fullContent += chunk;
         scheduleUpdate();
@@ -100,6 +127,7 @@ export function useChat(): UseChatReturn {
       () => {
         setIsStreaming(false);
         setIsTyping(false);
+        setToolStatus({ active: false, name: null });
         abortControllerRef.current = null;
       },
       (errorMsg) => {
@@ -112,16 +140,36 @@ export function useChat(): UseChatReturn {
         );
         setIsStreaming(false);
         setIsTyping(false);
+        setToolStatus({ active: false, name: null });
         abortControllerRef.current = null;
-      }
+      },
+      (sid) => {
+        setSessionId(sid);
+      },
+      (thinking) => {
+        thinkingAccum += thinking;
+        setToolStatus({ active: true, name: thinkingAccum });
+      },
+      (toolName) => {
+        setToolStatus({ active: true, name: toolName });
+      },
+      () => {
+        setToolStatus({ active: false, name: null });
+      },
+      thinkingMode ? THINKING_MODEL : FAST_MODEL,
     );
-  }, [appendMessage]);
+  }, [appendMessage, thinkingMode]);
 
   return {
     messages,
     isTyping,
     isStreaming,
+    toolStatus,
+    hasSession: sessionId !== null,
+    thinkingMode,
     sendMessage,
+    newSession,
+    toggleThinking,
     appendMessage,
   };
 }

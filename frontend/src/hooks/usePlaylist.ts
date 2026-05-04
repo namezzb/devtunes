@@ -47,6 +47,7 @@ export function usePlaylist(): UsePlaylistReturn {
       /[?&]id=(\d+)/,
       /\/playlist\/(\d+)/,
       /\/m\/playlist\?id=(\d+)/,
+      /\/m\/playlist\/(\d+)/,
     ];
 
     for (const pattern of patterns) {

@@ -18,6 +18,18 @@ interface NeteasePlaylist {
 interface NeteaseTrack {
   id: number;
   name: string;
+  ar: Array<{ id: number; name: string }>;
+  al: {
+    id: number;
+    name: string;
+    picUrl: string;
+  };
+  dt: number;
+}
+
+interface TransformedTrack {
+  id: number;
+  name: string;
   artists: Array<{ id: number; name: string }>;
   album: {
     name: string;
@@ -83,7 +95,7 @@ class NeteaseService {
    */
   async getPlaylistTracks(playlistId: number): Promise<{
     playlist: NeteasePlaylist;
-    tracks: Array<NeteaseTrack & { url?: string }>;
+    tracks: Array<TransformedTrack & { url?: string }>;
   }> {
     // Get playlist details and tracks in parallel
     const [playlistResponse, tracksResponse] = await Promise.all([
@@ -130,10 +142,21 @@ class NeteaseService {
       }
     }
 
-    const tracks = tracksData.songs.map((track: NeteaseTrack) => ({
-      ...track,
-      url: songUrls.get(track.id),
-    }));
+    const transformTrack = (raw: NeteaseTrack & { url?: string }): TransformedTrack & { url?: string } => ({
+      id: raw.id,
+      name: raw.name,
+      artists: raw.ar || [],
+      album: {
+        name: raw.al?.name || '',
+        picUrl: raw.al?.picUrl || '',
+      },
+      duration: raw.dt || 0,
+      url: raw.url ? `/api/playlist/proxy?url=${encodeURIComponent(raw.url)}` : undefined,
+    });
+
+    const tracks = tracksData.songs.map((track: NeteaseTrack) =>
+      transformTrack({ ...track, url: songUrls.get(track.id) })
+    );
 
     return { playlist, tracks };
   }

@@ -56,6 +56,39 @@ npm install
 npm run dev
 ```
 
+## Backend Setup
+
+The playlist import feature requires NeteaseCloudMusicApi to be running. The frontend proxies requests to this API.
+
+### Option 1: Docker (Recommended)
+
+```bash
+docker run -d -p 3000:3000 neteasecloudmusicapienhanced/api-enhanced
+```
+
+### Option 2: Node.js
+
+```bash
+git clone https://github.com/nicejji/NeteaseCloudMusicApi.git
+cd NeteaseCloudMusicApi
+npm install
+node app.js
+```
+
+### Environment Variable
+
+Set this environment variable for the frontend to connect to the API:
+
+```bash
+NETEASE_API_BASE=http://localhost:3000
+```
+
+## Troubleshooting
+
+- **Playlist import fails**: Ensure the NeteaseCloudMusicApi is running on port 3000. Check that no other process is using that port.
+- **Songs not loading**: Verify the `NETEASE_API_BASE` environment variable is set correctly and the API is healthy.
+- **CORS errors**: The API should be accessible from `http://localhost:5173` (Vite dev server) or your deployed frontend URL.
+
 ## License
 
 MIT

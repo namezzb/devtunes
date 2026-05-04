@@ -1,113 +1,125 @@
-import { Router, Request, Response, json } from 'express';
-import { spawn } from 'child_process';
-import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { Router, Request, Response } from 'express';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import path from 'path';
 
 const router = Router();
-router.use(json());
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+const SUPPORTED_MODELS = ['claude-sonnet-4-6', 'claude-haiku-4-5'] as const;
 
-function loadClaudeSettings() {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  console.log('Loading settings from:', settingsPath);
-  console.log('Exists:', existsSync(settingsPath));
-  if (existsSync(settingsPath)) {
-    try {
-      const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-      console.log('Settings env:', settings.env);
-      return settings.env || {};
-    } catch (e) {
-      console.log('Error parsing settings:', e);
-      return {};
-    }
-  }
-  return {};
-}
+const PROJECT_ROOT = path.resolve(process.cwd(), '..');
+
+const AGENT_SYSTEM_PROMPT = `You are an intelligent AI assistant integrated into DEVTunes, a music + developer productivity web app.
+
+## YOUR ROLE
+You provide emotional support, music recommendations, coding help, and life advice.
+You can read the user's project files to understand their work context.
+You respond in the user's language (Chinese for Chinese input, English for English input).
+
+## CAPABILITIES
+- Read and analyze code files in the project
+- Search for patterns across the codebase (Grep)
+- Browse project structure (Glob)
+- Provide programming advice and debugging help
+- Recommend music based on user's mood and context
+
+## BEHAVIOR
+- Be warm, empathetic, and conversational — like a pair programming buddy who also DJs
+- When the user seems stressed from coding, suggest a music break or specific genre
+- Use markdown formatting: code blocks for code, lists for enumeration, bold for emphasis
+- Keep responses concise but thorough`;
 
 router.post('/', async (req: Request, res: Response) => {
-  const { message, history = [] }: { message: string; history?: ChatMessage[] } = req.body;
+  const { message, sessionId, model }: { message: string; sessionId?: string; model?: string } = req.body;
 
   if (!message || message.trim() === '') {
     res.status(400).json({ error: 'Message is required' });
     return;
   }
 
+  if (model && !SUPPORTED_MODELS.includes(model as typeof SUPPORTED_MODELS[number])) {
+    res.status(400).json({ error: 'Invalid model. Supported: claude-sonnet-4-6, claude-haiku-4-5' });
+    return;
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  const heartbeat = setInterval(() => {
-    res.write(': heartbeat\n\n');
-  }, 30000);
+  try {
+    for await (const msg of query({
+      prompt: message,
+      options: {
+        includePartialMessages: true,
+        cwd: PROJECT_ROOT,
+        systemPrompt: AGENT_SYSTEM_PROMPT,
+        allowedTools: ['Read', 'Grep', 'Glob'],
+        permissionMode: 'bypassPermissions',
+        maxTurns: 15,
+        maxBudgetUsd: 1.0,
+        settingSources: ['user'],
+        ...(model ? { model } : {}),
+        ...(sessionId ? { resume: sessionId } : {}),
+      },
+    })) {
+      switch (msg.type) {
+        case 'system':
+          if (msg.subtype === 'init') {
+            res.write(`data: ${JSON.stringify({ type: 'init', sessionId: msg.session_id, model: msg.model })}\n\n`);
+          }
+          break;
 
-  const claudePath = process.env.CLAUDE_CODE_PATH || '/Users/zhangzibo/.local/bin/claude';
-  const prompt = buildPrompt(message, history);
-  const claudeSettings = loadClaudeSettings();
+        case 'assistant':
+          break;
 
-  const claudeEnv = {
-    ...process.env,
-    NO_COLOR: '1',
-    PATH: process.env.PATH + ':/Users/zhangzibo/.local/bin',
-    ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || claudeSettings.ANTHROPIC_BASE_URL || 'https://api.minimaxi.com/anthropic',
-    ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN || claudeSettings.ANTHROPIC_AUTH_TOKEN,
-  };
+        case 'stream_event': {
+          const event = msg.event;
+          if (!event || typeof event !== 'object') break;
 
-  console.log('claudeEnv ANTHROPIC_AUTH_TOKEN:', claudeEnv.ANTHROPIC_AUTH_TOKEN ? 'set' : 'not set');
+          if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+            res.write(`data: ${JSON.stringify({ type: 'tool_start', name: event.content_block.name })}\n\n`);
+          } else if (event.type === 'content_block_delta') {
+            const delta = event.delta;
+            if (delta?.type === 'text_delta' && delta.text) {
+              res.write(`data: ${JSON.stringify({ type: 'chunk', content: delta.text })}\n\n`);
+            } else if (delta?.type === 'thinking_delta' && delta.thinking) {
+              res.write(`data: ${JSON.stringify({ type: 'thinking', content: delta.thinking })}\n\n`);
+            } else if (delta?.type === 'input_json_delta' && delta.partial_json) {
+              res.write(`data: ${JSON.stringify({ type: 'tool_input', content: delta.partial_json })}\n\n`);
+            }
+          } else if (event.type === 'content_block_stop') {
+            res.write(`data: ${JSON.stringify({ type: 'tool_end' })}\n\n`);
+          }
+          break;
+        }
 
-  const claude = spawn(claudePath, ['-p', '--output-format', 'stream-json', prompt], {
-    env: claudeEnv,
-  });
-
-  claude.stdout.on('data', (data: Buffer) => {
-    const text = data.toString();
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.type === 'content' && parsed.content) {
-        res.write(`data: ${JSON.stringify({ type: 'chunk', content: parsed.content })}\n\n`);
+        case 'result':
+          if (msg.subtype === 'success') {
+            res.write(`data: ${JSON.stringify({
+              type: 'done',
+              sessionId: msg.session_id,
+              cost: msg.total_cost_usd,
+              turns: msg.num_turns,
+            })}\n\n`);
+          } else {
+            res.write(`data: ${JSON.stringify({
+              type: 'error',
+              error: msg.subtype,
+              errors: 'errors' in msg ? msg.errors : [],
+            })}\n\n`);
+          }
+          res.end();
+          return;
       }
-    } catch {
-      res.write(`data: ${JSON.stringify({ type: 'chunk', content: text })}\n\n`);
     }
-  });
 
-  claude.stderr.on('data', (data: Buffer) => {
-    console.error('Claude stderr:', data.toString());
-  });
-
-  claude.on('close', (code) => {
-    clearInterval(heartbeat);
-    if (code !== 0) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: `Claude exited with code ${code}` })}\n\n`);
-    }
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
     res.end();
-  });
-
-  claude.on('error', (err: Error) => {
-    clearInterval(heartbeat);
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    res.write(`data: ${JSON.stringify({ type: 'error', error: errorMessage })}\n\n`);
     res.end();
-  });
-});
-
-function buildPrompt(message: string, history: ChatMessage[]): string {
-  let prompt = 'You are a helpful AI assistant for developers.\n\n';
-
-  for (const msg of history) {
-    prompt += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
   }
-
-  prompt += `User: ${message}\n`;
-  prompt += 'Assistant: ';
-
-  return prompt;
-}
+});
 
 export default router;

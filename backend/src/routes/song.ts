@@ -1,17 +1,23 @@
 import { Router, Request, Response } from 'express';
-import { neteaseService } from '../services/netease.js';
+import { createMusicSource } from '../services/music-source-factory.js';
 
 const router = Router();
 
+function isValidTrackId(id: string): boolean {
+  if (/^[0-9]+$/.test(id)) return true;
+  if (/^[a-f0-9]{32}$/i.test(id)) return true;
+  return false;
+}
+
 router.get('/:id/url', async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
+    const id = req.params.id;
+    if (!isValidTrackId(id)) {
       res.status(400).json({ error: 'Invalid song ID' });
       return;
     }
-
-    const url = await neteaseService.getSongUrl(id);
+    const musicSource = createMusicSource();
+    const url = await musicSource.getTrackUrl(id);
     res.json({ success: true, data: { id, url } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -21,13 +27,13 @@ router.get('/:id/url', async (req: Request, res: Response) => {
 
 router.get('/:id/lyric', async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) {
+    const id = req.params.id;
+    if (!isValidTrackId(id)) {
       res.status(400).json({ error: 'Invalid song ID' });
       return;
     }
-
-    const lyric = await neteaseService.getLyric(id);
+    const musicSource = createMusicSource();
+    const lyric = await musicSource.getLyric(id);
     res.json({ success: true, data: lyric });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

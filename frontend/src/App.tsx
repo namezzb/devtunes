@@ -4,6 +4,7 @@ import { Aurora } from './components/effects/Aurora';
 import { AppProvider } from './context/AppContext';
 import { MobileView, DesktopView } from './components/ui/TabNavigation';
 import { ToastProvider } from './components/ui/Toast';
+import { ClockWeatherPanel } from './components/widget';
 
 function AppContent() {
   const [isDesktop, setIsDesktop] = useState(
@@ -25,7 +26,7 @@ function AppContent() {
       <Aurora isPlaying={true} />
 
       <div className="relative z-10 container mx-auto px-4 py-8 h-screen flex flex-col">
-        <header className="mb-8 text-center">
+        <header className="mb-6 text-center">
           <h1 className="text-4xl font-bold tracking-tight mb-2">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--aurora-start)] via-[var(--aurora-mid)] to-[var(--aurora-end)]">
               DEVTunes
@@ -33,6 +34,16 @@ function AppContent() {
           </h1>
           <p className="text-[var(--text-secondary)]">Music + AI Agent for Independent Developers</p>
         </header>
+
+        <div className="mb-6">
+          <ClockWeatherPanel
+            clockFormat="24h"
+            showSeconds={true}
+            showDate={true}
+            useMockWeather={true}
+            showForecast={true}
+          />
+        </div>
 
         <main className="flex-1 pb-8 min-h-0">
           {isDesktop ? <DesktopView /> : <MobileView />}

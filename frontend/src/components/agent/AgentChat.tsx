@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { useChat } from '../../hooks/useChat';
 
 export function AgentChat() {
-  const { messages, isTyping, sendMessage } = useChat();
+  const { messages, isTyping, isStreaming, sendMessage, toolStatus, hasSession, newSession, thinkingMode, toggleThinking } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const playingAudioIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,8 +52,23 @@ export function AgentChat() {
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
             AI Agent
           </span>
+          <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${
+            thinkingMode 
+              ? 'border-[var(--aurora-start)]/40 text-[var(--aurora-start)] bg-[var(--aurora-start)]/10' 
+              : 'border-white/10 text-[var(--text-secondary)] bg-white/5'
+          }`}>
+            {thinkingMode ? '思考模式' : '快速模式'}
+          </span>
         </h2>
         <div className="flex gap-2">
+          {hasSession && (
+            <Button variant="ghost" size="sm" onClick={newSession} className="hover:bg-white/10 text-white/70 hover:text-white transition-colors text-xs">
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="hover:bg-white/10 text-white/70 hover:text-white transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -67,6 +82,27 @@ export function AgentChat() {
           </Button>
         </div>
       </div>
+
+      {toolStatus.active && toolStatus.name && (
+        <div className="px-5 py-2 bg-black/20 border-b border-white/5 flex items-center gap-2 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5">
+            <motion.div
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="w-2 h-2 rounded-full bg-[var(--aurora-start)] flex-shrink-0"
+            />
+            <span className="text-xs text-[var(--text-secondary)] truncate max-w-full">
+              {toolStatus.name.startsWith('The ') || toolStatus.name.startsWith('用户') || toolStatus.name.includes(' is') || toolStatus.name.includes('需要') || toolStatus.name.length > 30
+                ? toolStatus.name
+                : toolStatus.name === 'Read' ? 'Reading files...'
+                : toolStatus.name === 'Grep' ? 'Searching codebase...'
+                : toolStatus.name === 'Glob' ? 'Browsing project...'
+                : toolStatus.name === 'Bash' ? 'Running command...'
+                : `Using ${toolStatus.name}...`}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar relative z-10">
         <AnimatePresence initial={false}>
@@ -130,7 +166,13 @@ export function AgentChat() {
       </div>
 
       <div className="relative z-10 bg-black/20 backdrop-blur-md border-t border-white/5">
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInput 
+              onSend={handleSend} 
+              disabled={isTyping} 
+              thinkingMode={thinkingMode}
+              onToggleThinking={toggleThinking}
+              isStreaming={isStreaming}
+            />
       </div>
     </div>
   );
