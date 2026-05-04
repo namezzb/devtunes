@@ -163,13 +163,19 @@ export function chat(
   onToolStart?: (name: string) => void,
   onToolEnd?: () => void,
   model?: string,
+  thinkingMode?: boolean,
 ): () => void {
   const controller = new AbortController();
 
   fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, ...(sessionId ? { sessionId } : {}), ...(model ? { model } : {}) }),
+    body: JSON.stringify({
+      message,
+      ...(sessionId ? { sessionId } : {}),
+      ...(model ? { model } : {}),
+      thinkingMode: thinkingMode ?? true,
+    }),
     signal: controller.signal,
   })
     .then(async (response) => {

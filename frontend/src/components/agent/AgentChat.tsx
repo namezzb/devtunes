@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { useChat } from '../../hooks/useChat';
 
 export function AgentChat() {
-  const { messages, isTyping, isStreaming, sendMessage, toolStatus, hasSession, newSession, thinkingMode, toggleThinking } = useChat();
+  const { messages, isTyping, isStreaming, sendMessage, toolStatus, thinkingContent, hasSession, newSession, thinkingMode, toggleThinking } = useChat();
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const playingAudioIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -83,7 +83,7 @@ export function AgentChat() {
         </div>
       </div>
 
-      {toolStatus.active && toolStatus.name && (
+      {toolStatus.active && toolStatus.name && !thinkingContent && (
         <div className="px-5 py-2 bg-black/20 border-b border-white/5 flex items-center gap-2 min-w-0 overflow-hidden">
           <div className="flex items-center gap-1.5">
             <motion.div
@@ -106,12 +106,13 @@ export function AgentChat() {
 
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar relative z-10">
         <AnimatePresence initial={false}>
-          {messages.map(msg => (
-            <ChatMessage 
+          {messages.map((msg, index) => (
+            <ChatMessage
               key={msg.id}
               {...msg}
               onPlayAudio={handlePlayAudio}
               isPlaying={playingAudioId === msg.id}
+              thinkingContent={index === messages.length - 1 && msg.role === 'agent' ? thinkingContent : null}
             />
           ))}
           

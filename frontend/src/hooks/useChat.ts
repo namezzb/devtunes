@@ -21,6 +21,7 @@ interface UseChatReturn {
   isTyping: boolean;
   isStreaming: boolean;
   toolStatus: ToolStatus;
+  thinkingContent: string | null;
   hasSession: boolean;
   thinkingMode: boolean;
   sendMessage: (content: string) => void;
@@ -36,6 +37,7 @@ export function useChat(): UseChatReturn {
   const [toolStatus, setToolStatus] = useState<ToolStatus>({ active: false, name: null });
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [thinkingMode, setThinkingMode] = useState(true);
+  const [thinkingContent, setThinkingContent] = useState<string | null>(null);
   const abortControllerRef = useRef<(() => void) | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
@@ -83,6 +85,7 @@ export function useChat(): UseChatReturn {
     setIsTyping(false);
     setIsStreaming(true);
     setToolStatus({ active: false, name: null });
+    setThinkingContent(null);
 
     let agentMessageId: string;
     setMessages((prev) => {
@@ -148,7 +151,7 @@ export function useChat(): UseChatReturn {
       },
       (thinking) => {
         thinkingAccum += thinking;
-        setToolStatus({ active: true, name: thinkingAccum });
+        setThinkingContent(thinkingAccum);
       },
       (toolName) => {
         setToolStatus({ active: true, name: toolName });
@@ -157,6 +160,7 @@ export function useChat(): UseChatReturn {
         setToolStatus({ active: false, name: null });
       },
       thinkingMode ? THINKING_MODEL : FAST_MODEL,
+      thinkingMode,
     );
   }, [appendMessage, thinkingMode]);
 
@@ -165,6 +169,7 @@ export function useChat(): UseChatReturn {
     isTyping,
     isStreaming,
     toolStatus,
+    thinkingContent,
     hasSession: sessionId !== null,
     thinkingMode,
     sendMessage,

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import remarkGfm from 'remark-gfm';
 
 interface ChatMessageProps {
   id: string;
@@ -11,11 +12,13 @@ interface ChatMessageProps {
   timestamp: string;
   onPlayAudio?: (id: string) => void;
   isPlaying?: boolean;
+  thinkingContent?: string | null;
 }
 
-export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, id }: ChatMessageProps) {
+export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, id, thinkingContent }: ChatMessageProps) {
   const isUser = role === 'user';
   const isError = content.startsWith('Error:');
+  const [showThinking, setShowThinking] = useState(false);
 
   return (
     <motion.div
@@ -73,13 +76,14 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                     content
                   ) : (
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       components={{
                         code({ className, children, ...props }) {
                           const match = /language-(\w+)/.exec(className || '');
                           const codeStr = String(children).replace(/\n$/, '');
                           if (!match) {
                             return (
-                              <code className="bg-white/10 text-[var(--aurora-start)] px-1.5 py-0.5 rounded text-xs font-mono break-all" {...props}>
+                              <code className="bg-white/10 text-[var(--aurora-start)] px-1.5 py-0.5 rounded text-xs font-mono break-words" {...props}>
                                 {children}
                               </code>
                             );
@@ -99,7 +103,7 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                                   background: 'rgba(0,0,0,0.4)',
                                   fontSize: '0.8rem',
                                   whiteSpace: 'pre-wrap',
-                                  wordBreak: 'break-all',
+                                  wordBreak: 'break-word',
                                   overflowWrap: 'break-word',
                                 }}
                               >
@@ -134,10 +138,59 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                             </a>
                           );
                         },
+                        table({ children }) {
+                          return (
+                            <div className="overflow-x-auto my-3">
+                              <table className="min-w-full text-xs border-collapse border border-white/10">
+                                {children}
+                              </table>
+                            </div>
+                          );
+                        },
+                        th({ children }) {
+                          return <th className="border border-white/10 px-3 py-2 bg-white/5 font-semibold text-left">{children}</th>;
+                        },
+                        td({ children }) {
+                          return <td className="border border-white/10 px-3 py-2">{children}</td>;
+                        },
+                        del({ children }) {
+                          return <del className="line-through text-[var(--text-muted)]">{children}</del>;
+                        },
+                        li({ className, children, ...props }) {
+                          if (className?.includes('task-list-item')) {
+                            return <li className="list-none flex items-start gap-2 mb-1" {...props}>{children}</li>;
+                          }
+                          return <li className="mb-1" {...props}>{children}</li>;
+                        },
+                        input({ ...props }) {
+                          return <input {...props} readOnly className="accent-[var(--aurora-start)] mt-0.5 flex-shrink-0" />;
+                        },
                       }}
                     >
                       {content}
                     </ReactMarkdown>
+                  )}
+
+                  {!isUser && thinkingContent && (
+                    <div className="mt-3 border-t border-white/5 pt-2">
+                      <button
+                        onClick={() => setShowThinking(!showThinking)}
+                        className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors mb-1"
+                      >
+                        <svg
+                          className={`w-3 h-3 transition-transform ${showThinking ? 'rotate-90' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        {showThinking ? 'Hide thinking' : `Show thinking (${thinkingContent.length} chars)`}
+                      </button>
+                      {showThinking && (
+                        <div className="text-xs leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)] bg-black/20 rounded-lg p-3 font-mono border border-white/5 max-h-60 overflow-y-auto custom-scrollbar">
+                          {thinkingContent}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 

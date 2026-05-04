@@ -29,7 +29,7 @@ You respond in the user's language (Chinese for Chinese input, English for Engli
 - Keep responses concise but thorough`;
 
 router.post('/', async (req: Request, res: Response) => {
-  const { message, sessionId, model }: { message: string; sessionId?: string; model?: string } = req.body;
+  const { message, sessionId, model, thinkingMode }: { message: string; sessionId?: string; model?: string; thinkingMode?: boolean } = req.body;
 
   if (!message || message.trim() === '') {
     res.status(400).json({ error: 'Message is required' });
@@ -46,6 +46,11 @@ router.post('/', async (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
+  const thinkingConfig: { type: 'adaptive' } | { type: 'disabled' } = thinkingMode
+    ? { type: 'adaptive' }
+    : { type: 'disabled' };
+  const effortLevel: 'high' | 'low' = thinkingMode ? 'high' : 'low';
+
   try {
     for await (const msg of query({
       prompt: message,
@@ -58,6 +63,8 @@ router.post('/', async (req: Request, res: Response) => {
         maxTurns: 15,
         maxBudgetUsd: 1.0,
         settingSources: ['user'],
+        thinking: thinkingConfig,
+        effort: effortLevel,
         ...(model ? { model } : {}),
         ...(sessionId ? { resume: sessionId } : {}),
       },
