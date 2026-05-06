@@ -95,6 +95,24 @@ export async function searchSongs(keyword: string): Promise<SearchResult> {
   };
 }
 
+export interface ChatContext {
+  weather: {
+    temperature: number;
+    condition: string;
+    feelsLike: number;
+    humidity: number;
+    location: string;
+  } | null;
+  clock: {
+    hours: string;
+    minutes: string;
+    dayOfWeek: string;
+    date: string;
+    period: 'AM' | 'PM';
+  };
+  timeCategory: string;
+}
+
 export function chat(
   message: string,
   sessionId: string | null,
@@ -107,6 +125,7 @@ export function chat(
   onToolEnd?: () => void,
   model?: string,
   thinkingMode?: boolean,
+  context?: ChatContext,
 ): () => void {
   const controller = new AbortController();
 
@@ -118,6 +137,7 @@ export function chat(
       ...(sessionId ? { sessionId } : {}),
       ...(model ? { model } : {}),
       thinkingMode: thinkingMode ?? true,
+      ...(context ? { context } : {}),
     }),
     signal: controller.signal,
   })

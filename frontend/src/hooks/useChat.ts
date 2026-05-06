@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { chat } from '../services/api';
+import { useChatContext } from '../context/ChatContext';
 
 const THINKING_MODEL = 'claude-sonnet-4-6';
 const FAST_MODEL = 'claude-haiku-4-5';
@@ -40,6 +41,7 @@ export function useChat(): UseChatReturn {
   const [thinkingContent, setThinkingContent] = useState<string | null>(null);
   const abortControllerRef = useRef<(() => void) | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const chatContext = useChatContext();
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -161,8 +163,13 @@ export function useChat(): UseChatReturn {
       },
       thinkingMode ? THINKING_MODEL : FAST_MODEL,
       thinkingMode,
+      {
+        weather: chatContext.weather,
+        clock: chatContext.clock,
+        timeCategory: chatContext.timeCategory,
+      },
     );
-  }, [appendMessage, thinkingMode]);
+  }, [appendMessage, thinkingMode, chatContext]);
 
   return {
     messages,

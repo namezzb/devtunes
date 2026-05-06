@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StarField } from './components/effects/StarField';
 import { Aurora } from './components/effects/Aurora';
 import { AppProvider } from './context/AppContext';
+import { ChatContextProvider } from './context/ChatContext';
 import { MobileView, DesktopView } from './components/ui/TabNavigation';
 import { ToastProvider } from './components/ui/Toast';
 import { ClockWeatherPanel } from './components/widget';
@@ -60,8 +61,10 @@ function AppContent() {
 function App() {
   return (
     <AppProvider>
-      <ToastProvider />
-      <AppContent />
+      <ChatContextProvider>
+        <ToastProvider />
+        <AppContent />
+      </ChatContextProvider>
     </AppProvider>
   );
 }
