@@ -235,6 +235,7 @@ def download_playlist(body: DownloadRequest) -> DownloadResponse:
     _download_progress["current_song"] = ""
 
     try:
+        resolved_url = _resolve_playlist_url(playlist_url)
         client = MusicClient(
             music_sources=["NeteaseMusicClient"],
             init_music_clients_cfg={
@@ -244,7 +245,7 @@ def download_playlist(body: DownloadRequest) -> DownloadResponse:
                 }
             },
         )
-        songs = client.parseplaylist(playlist_url)
+        songs = client.parseplaylist(resolved_url)
     except Exception as e:
         _download_progress["status"] = "failed"
         return DownloadResponse(success=False, error=f"{type(e).__name__}: {e}")
@@ -270,17 +271,8 @@ def download_playlist(body: DownloadRequest) -> DownloadResponse:
             continue
 
         try:
-            song_client = MusicClient(
-                music_sources=["NeteaseMusicClient"],
-                init_music_clients_cfg={
-                    "NeteaseMusicClient": {
-                        "work_dir": target_dir,
-                        "disable_print": True,
-                    }
-                },
-            )
-            success = _download_with_timeout(song_client, song, timeout=60)
-            if success and os.path.exists(song.save_path):
+            success = _download_with_timeout(client, song, timeout=120)
+            if success and _file_exists_for_song(target_dir, song.identifier, song.ext):
                 downloaded += 1
             else:
                 failed += 1

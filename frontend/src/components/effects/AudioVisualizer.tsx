@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
 interface AudioVisualizerProps {
   isPlaying: boolean;
@@ -7,11 +7,32 @@ interface AudioVisualizerProps {
 
 export function AudioVisualizer({ isPlaying, audioElement }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const previousElementRef = useRef<HTMLAudioElement | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
+
+  // ResizeObserver: sync canvas dimensions to container size
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+
+    const resize = () => {
+      const { clientWidth, clientHeight } = container;
+      if (canvas.width !== clientWidth || canvas.height !== clientHeight) {
+        canvas.width = clientWidth;
+        canvas.height = clientHeight;
+      }
+    };
+
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!audioElement || !isPlaying) {
@@ -120,11 +141,11 @@ export function AudioVisualizer({ isPlaying, audioElement }: AudioVisualizerProp
   }, [isPlaying, audioElement]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={200}
-      height={200}
-      className="absolute inset-0 w-full h-full pointer-events-none"
-    />
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full"
+      />
+    </div>
   );
 }

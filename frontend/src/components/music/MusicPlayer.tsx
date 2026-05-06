@@ -172,7 +172,7 @@ export function MusicPlayer() {
         </Button>
       </div>
 
-      <div className="relative flex-1 min-h-[30px] max-h-[80px] flex items-center justify-center border-b border-white/5 overflow-hidden bg-black/60">
+      <div className="relative flex-shrink-0 h-48 min-h-[120px] flex items-center justify-center border-b border-white/5 overflow-hidden bg-black/60">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40 z-10" />
         <MusicParticles isPlaying={isPlaying} />
         <BlackHole isPlaying={isPlaying} />

@@ -126,7 +126,9 @@ export function useAudioEngine(): UseAudioEngineReturn {
     const tick = () => {
       if (howlRef.current) {
         const pos = howlRef.current.seek() as number;
-        dispatch({ type: 'TICK', position: pos });
+        if (howlRef.current.state() === 'loaded') {
+          dispatch({ type: 'TICK', position: pos });
+        }
         rafRef.current = requestAnimationFrame(tick);
       }
     };
@@ -164,6 +166,7 @@ export function useAudioEngine(): UseAudioEngineReturn {
         dispatch({ type: 'LOAD_ERROR', error: 'Track has no URL' });
         return;
       }
+      const trackUrl = track.url;
 
       loadIdRef.current += 1;
       const thisLoadId = loadIdRef.current;
@@ -171,9 +174,9 @@ export function useAudioEngine(): UseAudioEngineReturn {
       dispatch({ type: 'LOAD_TRACK', track });
 
       const howl = new Howl({
-        src: [track.url],
-        html5: true,
-        format: ['wav', 'mp3'],
+        src: [trackUrl],
+        html5: false,
+        format: ['wav', 'mp3', 'flac'],
         preload: true,
         volume: state.volume / 100,
         onload: () => {
@@ -184,7 +187,9 @@ export function useAudioEngine(): UseAudioEngineReturn {
         },
         onloaderror: (_id: number, errorCode: unknown) => {
           if (loadIdRef.current !== thisLoadId) return;
-          dispatch({ type: 'LOAD_ERROR', error: `Failed to load audio (code ${errorCode})` });
+          const errorMsg = `Audio load error: ${track.title} (${trackUrl}), code=${errorCode}, html5=${!trackUrl.startsWith('blob:')}`;
+          console.error(errorMsg);
+          dispatch({ type: 'LOAD_ERROR', error: errorMsg });
         },
         onplay: (_id: number) => {
           if (loadIdRef.current !== thisLoadId) return;
@@ -203,7 +208,8 @@ export function useAudioEngine(): UseAudioEngineReturn {
         },
         onplayerror: (_id: number, _error: unknown) => {
           if (loadIdRef.current !== thisLoadId) return;
-          dispatch({ type: 'LOAD_ERROR', error: 'Playback failed' });
+          console.error(`Audio play error: ${track.title} (${trackUrl})`);
+          dispatch({ type: 'LOAD_ERROR', error: `Playback failed for ${track.title}` });
         },
       });
 

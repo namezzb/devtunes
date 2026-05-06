@@ -70,10 +70,10 @@ export function MobileView() {
 export function DesktopView() {
   return (
     <div className="hidden lg:flex flex-1 gap-6 min-h-0">
-      <div className="flex-[1.5] min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col">
         <MusicPlayer />
       </div>
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-[1.5] min-h-0 flex flex-col">
         <AgentChat />
       </div>
     </div>
