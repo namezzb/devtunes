@@ -28,7 +28,7 @@ function AppContent() {
       </div>
 
       <div className="relative z-10 h-full w-full overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <div className="container mx-auto px-4 py-8 min-h-full flex flex-col">
+        <div className="container mx-auto px-4 py-8 h-full flex flex-col">
           <header className="mb-6 text-center flex-shrink-0">
             <h1 className="text-4xl font-bold tracking-tight mb-2">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--aurora-start)] via-[var(--aurora-mid)] to-[var(--aurora-end)]">

@@ -24,7 +24,7 @@ export interface Track {
   coverUrl: string;
   duration: number;
   url?: string;
-  source?: 'local' | 'netease';
+  source?: 'local';
 }
 
 interface TrackListProps {
@@ -148,7 +148,7 @@ export function TrackList({ tracks, currentTrackId, onTrackSelect, onReorder }: 
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={tracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-1">
+        <div className="absolute inset-0 overflow-y-auto custom-scrollbar px-4 space-y-1 h-full">
           {tracks.map((track) => {
             const isPlaying = track.id === currentTrackId;
 

@@ -8,10 +8,10 @@ import { BlackHole } from '../effects/BlackHole';
 import { AudioVisualizer } from '../effects/AudioVisualizer';
 import { MusicParticles } from '../effects/MusicParticles';
 import { toast } from '../ui/Toast';
-import { usePlaylist } from '../../hooks/usePlaylist';
 import { usePlaybackSync } from '../../hooks/usePlaybackSync';
 import { useAudioEngine } from '../../hooks/useAudioEngine';
 import { getCachedDemoAudioUrl } from '../../utils/audioGenerator';
+import { scanLibrary, getLocalTracks } from '../../services/api';
 
 const MOCK_TRACKS: Track[] = [
   { id: '1', title: 'Cyberpunk City', artist: 'Neon Dreams', coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=200&auto=format&fit=crop', duration: 6 },
@@ -28,23 +28,44 @@ function buildMockTracks(): Track[] {
 }
 
 export function MusicPlayer() {
-  const { playlist: apiPlaylist, tracks, loading, error, importPlaylist } = usePlaylist();
   const { state, loadTrack, togglePlay, seek, setVolume, toggleMute, nextTrack, prevTrack, audioNode } = useAudioEngine();
 
-  const [playlist, setPlaylist] = useState<Track[]>(() => buildMockTracks());
+  const [playlist, setPlaylist] = useState<Track[]>([]);
   const [playMode, setPlayMode] = useState<'loop' | 'random'>('loop');
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [clickEffect, setClickEffect] = useState<{ x: number; y: number; id: number } | null>(null);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(true);
 
-  const displayTracks = tracks.length > 0 ? tracks : playlist;
+  const displayTracks = playlist.length > 0 ? playlist : (isLoadingLibrary ? [] : buildMockTracks());
   const currentTrack = state.currentTrack || (displayTracks.length > 0 ? displayTracks[0] : null);
   const isPlaying = state.status === 'playing';
 
+  // Auto-import local songs on mount
   useEffect(() => {
-    if (displayTracks.length > 0) {
+    let cancelled = false;
+    getLocalTracks()
+      .then((tracks) => {
+        if (!cancelled) {
+          if (tracks.length > 0) {
+            setPlaylist(tracks);
+          }
+          setIsLoadingLibrary(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsLoadingLibrary(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Auto-load first track when playlist is ready
+  useEffect(() => {
+    if (!isLoadingLibrary && displayTracks.length > 0) {
       loadTrack(displayTracks[0], false);
     }
-  }, []);
+  }, [isLoadingLibrary]);
 
   usePlaybackSync({
     currentTrack,
@@ -111,29 +132,27 @@ export function MusicPlayer() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleImport = useCallback(
-    async (url: string) => {
-      await importPlaylist(url);
-      setIsImportOpen(false);
-      toast.success('歌单导入成功');
-    },
-    [importPlaylist],
-  );
-
   const handleImportLocalTracks = useCallback(
-    (localTracks: Track[]) => {
+    async (localTracks: Track[]) => {
       setPlaylist(localTracks);
       if (localTracks.length > 0) {
         loadTrack(localTracks[0], true);
       }
       setIsImportOpen(false);
-      toast.success(`已导入 ${localTracks.length} 首本地音乐`);
+      toast.success(`已导入 ${localTracks.length} 首音乐`);
+
+      // Trigger library rescan to pick up any newly downloaded files
+      try {
+        await scanLibrary();
+      } catch {
+        // Library scan is best-effort after import
+      }
     },
-    [loadTrack],
+    [loadTrack, scanLibrary],
   );
 
   return (
-    <div className="glass-card flex flex-col h-full overflow-hidden relative z-10 shadow-[0_0_40px_rgba(0,0,0,0.5)] border-white/10">
+    <div className="glass-card flex flex-col flex-1 min-h-0 overflow-hidden relative z-10 shadow-[0_0_40px_rgba(0,0,0,0.5)] border-white/10">
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--aurora-start)]/5 via-transparent to-[var(--aurora-end)]/5 pointer-events-none" />
 
       <div className="p-5 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-md relative z-10">
@@ -153,17 +172,17 @@ export function MusicPlayer() {
         </Button>
       </div>
 
-      <div className="relative h-64 flex items-center justify-center border-b border-white/5 overflow-hidden bg-black/60">
+      <div className="relative flex-1 min-h-[30px] max-h-[80px] flex items-center justify-center border-b border-white/5 overflow-hidden bg-black/60">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40 z-10" />
         <MusicParticles isPlaying={isPlaying} />
         <BlackHole isPlaying={isPlaying} />
         <AudioVisualizer isPlaying={isPlaying} audioElement={audioNode} />
       </div>
 
-      <div className="p-6 bg-black/40 backdrop-blur-xl relative z-10">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4 group">
-            <div className="relative w-14 h-14 rounded-xl overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+      <div className="p-2 bg-black/40 backdrop-blur-xl relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 group">
+            <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
               <motion.img
                 src={currentTrack?.coverUrl || ''}
                 alt="Cover"
@@ -182,7 +201,7 @@ export function MusicPlayer() {
               )}
             </div>
             <div>
-              <h3 className="text-white font-medium text-lg group-hover:text-[var(--aurora-start)] transition-colors">{currentTrack?.title || 'No track selected'}</h3>
+              <h3 className="text-white font-medium text-base group-hover:text-[var(--aurora-start)] transition-colors">{currentTrack?.title || 'No track selected'}</h3>
               <p className="text-[var(--text-secondary)] text-sm">{currentTrack?.artist || 'Select a track'}</p>
             </div>
           </div>
@@ -199,7 +218,7 @@ export function MusicPlayer() {
           </div>
         </div>
 
-        <div className="space-y-2 mb-6">
+        <div className="space-y-1.5 mb-3">
           <Slider
             value={state.position}
             max={state.duration || currentTrack?.duration || 0}
@@ -212,8 +231,8 @@ export function MusicPlayer() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 w-1/4 group">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 w-1/4 group">
             <button
               onClick={toggleMute}
               className="p-1 text-[var(--text-muted)] hover:text-white transition-colors"
@@ -240,8 +259,8 @@ export function MusicPlayer() {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <button onClick={handlePrev} className="p-2 text-[var(--text-secondary)] hover:text-white hover:scale-110 transition-all">
+          <div className="flex items-center gap-4">
+            <button onClick={handlePrev} className="p-1.5 text-[var(--text-secondary)] hover:text-white hover:scale-110 transition-all">
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
               </svg>
@@ -250,7 +269,7 @@ export function MusicPlayer() {
             <div className="relative">
               <button
                 onClick={handleTogglePlay}
-                className="relative w-14 h-14 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--aurora-start)] to-[var(--aurora-mid)] text-white shadow-[0_0_20px_rgba(0,255,200,0.4)] hover:shadow-[0_0_30px_rgba(0,255,200,0.6)] hover:scale-105 transition-all duration-300 z-10"
+                className="relative w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-br from-[var(--aurora-start)] to-[var(--aurora-mid)] text-white shadow-[0_0_20px_rgba(0,255,200,0.4)] hover:shadow-[0_0_30px_rgba(0,255,200,0.6)] hover:scale-105 transition-all duration-300 z-10"
               >
                 {isPlaying ? (
                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -277,7 +296,7 @@ export function MusicPlayer() {
               </AnimatePresence>
             </div>
 
-            <button onClick={handleNext} className="p-2 text-[var(--text-secondary)] hover:text-white hover:scale-110 transition-all">
+            <button onClick={handleNext} className="p-1.5 text-[var(--text-secondary)] hover:text-white hover:scale-110 transition-all">
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
               </svg>
@@ -288,11 +307,11 @@ export function MusicPlayer() {
         </div>
       </div>
 
-      <div className="flex-1 p-4 overflow-hidden flex flex-col relative z-10 bg-black/20">
-        <h3 className="text-xs font-medium text-[var(--text-secondary)] mb-3 px-2 uppercase tracking-wider">
-          {loading ? '加载中...' : apiPlaylist ? apiPlaylist.name : '当前播放列表'}
+      <div className="flex-1 min-h-0 py-2 flex flex-col relative z-10 bg-black/20">
+        <h3 className="text-xs font-medium text-[var(--text-secondary)] mb-2 px-4 uppercase tracking-wider flex-shrink-0">
+          当前播放列表
         </h3>
-        {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+        <div className="flex-1 min-h-0 relative">
         <TrackList
           tracks={displayTracks}
           currentTrackId={currentTrack?.id || ''}
@@ -301,12 +320,13 @@ export function MusicPlayer() {
             setPlaylist(newPlaylist);
           }}
         />
+        </div>
+
       </div>
 
       <PlaylistImport
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        onImport={handleImport}
         onImportLocalTracks={handleImportLocalTracks}
       />
     </div>

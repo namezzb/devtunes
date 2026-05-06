@@ -131,6 +131,9 @@ export function ChatMessage({ role, content, timestamp, onPlayAudio, isPlaying, 
                             </blockquote>
                           );
                         },
+                        hr() {
+                          return <hr className="my-4 border-t border-white/10" />;
+                        },
                         a({ href, children }) {
                           return (
                             <a href={href} target="_blank" rel="noopener noreferrer" className="text-[var(--aurora-start)] underline hover:text-[var(--aurora-mid)] transition-colors">

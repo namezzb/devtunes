@@ -18,14 +18,14 @@ export function usePlaybackSync(state: PlaybackSyncState) {
   useEffect(() => {
     const now = Date.now();
 
-    if (now - lastSyncRef.current < 500) {
+    if (now - lastSyncRef.current < 3000) {
       if (pendingRef.current) {
         clearTimeout(pendingRef.current);
       }
       pendingRef.current = setTimeout(() => {
         syncState(state);
         lastSyncRef.current = Date.now();
-      }, 500);
+      }, 3000);
       return;
     }
 
@@ -37,15 +37,8 @@ export function usePlaybackSync(state: PlaybackSyncState) {
         clearTimeout(pendingRef.current);
       }
     };
-  }, [state.currentTrack?.id, state.isPlaying, state.playMode, state]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      syncState(state);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only sync on meaningful state changes, not on every progress tick
+  }, [state.currentTrack?.id, state.isPlaying, state.playMode]);
 }
 
 async function syncState(state: PlaybackSyncState) {

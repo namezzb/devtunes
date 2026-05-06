@@ -59,7 +59,7 @@ export function MobileView() {
 
   return (
     <div className="lg:hidden flex flex-col flex-1">
-      <div className="flex-1 min-h-[600px] flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col">
         {activeTab === 'music' ? <MusicPlayer /> : <AgentChat />}
       </div>
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
@@ -69,8 +69,8 @@ export function MobileView() {
 
 export function DesktopView() {
   return (
-    <div className="hidden lg:flex flex-1 gap-6 min-h-[600px]">
-      <div className="flex-1 min-h-0 flex flex-col">
+    <div className="hidden lg:flex flex-1 gap-6 min-h-0">
+      <div className="flex-[1.5] min-h-0 flex flex-col">
         <MusicPlayer />
       </div>
       <div className="flex-1 min-h-0 flex flex-col">

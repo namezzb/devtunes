@@ -1,16 +1,3 @@
-export interface Playlist {
-  id: string;
-  name: string;
-  coverImgUrl: string;
-  description: string;
-  trackCount: number;
-  playCount: number;
-  creator: {
-    nickname: string;
-    avatarUrl: string;
-  };
-}
-
 export interface Track {
   id: string;
   title: string;
@@ -18,7 +5,7 @@ export interface Track {
   coverUrl: string;
   duration: number;
   url?: string;
-  source?: 'local' | 'netease';
+  source?: 'local';
 }
 
 export interface PlaybackState {
@@ -31,11 +18,6 @@ export interface PlaybackState {
   currentIndex: number;
   playMode: 'list' | 'shuffle' | 'repeat';
   timestamp: number;
-}
-
-export interface PlaylistTracks {
-  playlist: Playlist;
-  tracks: Track[];
 }
 
 export interface SearchResult {
@@ -63,20 +45,6 @@ export interface ChatChunk {
   model?: string;
 }
 
-// Backend response types (raw from API)
-interface BackendPlaylist {
-  id: number;
-  name: string;
-  coverImgUrl: string;
-  description: string;
-  trackCount: number;
-  playCount: number;
-  creator: {
-    nickname: string;
-    avatarUrl: string;
-  };
-}
-
 interface BackendTrack {
   id: number;
   name: string;
@@ -89,18 +57,6 @@ interface BackendTrack {
 }
 
 // Transform backend types to frontend types
-function transformPlaylist(raw: BackendPlaylist): Playlist {
-  return {
-    id: String(raw.id),
-    name: raw.name,
-    coverImgUrl: raw.coverImgUrl,
-    description: raw.description || '',
-    trackCount: raw.trackCount,
-    playCount: raw.playCount,
-    creator: raw.creator,
-  };
-}
-
 function transformTrack(raw: BackendTrack & { url?: string; source?: string }): Track {
   return {
     id: String(raw.id),
@@ -109,7 +65,7 @@ function transformTrack(raw: BackendTrack & { url?: string; source?: string }): 
     coverUrl: raw.album?.picUrl || '',
     duration: Math.floor((raw.duration || 0) / 1000),
     url: raw.url,
-    source: (raw.source as 'local' | 'netease') || 'netease',
+    source: 'local' as const,
   };
 }
 
@@ -128,19 +84,6 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T> 
   }
 
   return response.json();
-}
-
-export async function getPlaylist(id: string): Promise<Playlist> {
-  const data = await apiFetch<{ success: boolean; data: BackendPlaylist }>(`/api/playlist/${id}`);
-  return transformPlaylist(data.data);
-}
-
-export async function getPlaylistTracks(id: string): Promise<PlaylistTracks> {
-  const data = await apiFetch<{ success: boolean; data: { playlist: BackendPlaylist; tracks: (BackendTrack & { url?: string })[] } }>(`/api/playlist/${id}/tracks`);
-  return {
-    playlist: transformPlaylist(data.data.playlist),
-    tracks: data.data.tracks.map(transformTrack),
-  };
 }
 
 export async function searchSongs(keyword: string): Promise<SearchResult> {
@@ -314,5 +257,60 @@ export async function scanLibrary(): Promise<{ trackCount: number; tracks: Track
 
 export async function getLocalTracks(): Promise<Track[]> {
   const data = await apiFetch<{ success: boolean; data: Track[] }>('/api/library');
+  return data.data;
+}
+
+export interface ImportPlaylistResult {
+  playlistId: string;
+  name: string;
+  tracks: Track[];
+}
+
+export interface DownloadResult {
+  total: number;
+  downloaded: number;
+  skipped: number;
+  failed: number;
+  errors: Array<{ song: string; error: string }>;
+}
+
+export interface ImportStatus {
+  total: number;
+  completed: number;
+  currentSong: string;
+  status: 'idle' | 'downloading' | 'completed' | 'failed';
+}
+
+export async function importMusicdlPlaylist(url: string): Promise<ImportPlaylistResult> {
+  const data = await apiFetch<{ success: boolean; data: ImportPlaylistResult }>('/api/playlist/import', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
+  return data.data;
+}
+
+export async function downloadMusicdlPlaylist(
+  playlistUrl: string,
+  targetDir: string,
+  songIdentifiers?: string[]
+): Promise<DownloadResult> {
+  const data = await apiFetch<{ success: boolean; data: DownloadResult }>('/api/playlist/import/download', {
+    method: 'POST',
+    body: JSON.stringify({ playlistUrl, targetDir, songIdentifiers }),
+  });
+  return data.data;
+}
+
+export async function getImportStatus(): Promise<ImportStatus> {
+  const data = await apiFetch<{ success: boolean; data: ImportStatus }>('/api/playlist/import-status');
+  return data.data;
+}
+
+export interface LibraryConfig {
+  musicLibraryPath: string;
+}
+
+export async function getLibraryConfig(): Promise<LibraryConfig> {
+  const data = await apiFetch<{ success: boolean; data: LibraryConfig }>('/api/library/config');
   return data.data;
 }

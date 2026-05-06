@@ -174,7 +174,7 @@ export function useAudioEngine(): UseAudioEngineReturn {
         src: [track.url],
         html5: true,
         format: ['wav', 'mp3'],
-        preload: 'metadata' as 'metadata',
+        preload: true,
         volume: state.volume / 100,
         onload: () => {
           if (loadIdRef.current !== thisLoadId) return;

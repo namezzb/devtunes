@@ -1,80 +1,63 @@
 import { useState, useCallback } from 'react';
-import { getPlaylist, getPlaylistTracks, Playlist, Track } from '../services/api';
+import type { Track, ImportPlaylistResult } from '../services/api';
+import {
+  importMusicdlPlaylist as apiImportPlaylist,
+  getImportStatus as apiGetImportStatus,
+  type ImportStatus,
+} from '../services/api';
 
 interface PlaylistState {
-  playlist: Playlist | null;
   tracks: Track[];
   loading: boolean;
   error: string | null;
+  importResult: ImportPlaylistResult | null;
+  downloadStatus: ImportStatus | null;
 }
 
-interface UsePlaylistReturn extends PlaylistState {
-  loadPlaylist: (id: string) => Promise<void>;
-  importPlaylist: (url: string) => Promise<void>;
-  extractPlaylistId: (url: string) => string | null;
-}
-
-export function usePlaylist(): UsePlaylistReturn {
-  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+export function usePlaylist() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<ImportPlaylistResult | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<ImportStatus | null>(null);
 
-  const loadPlaylist = useCallback(async (id: string) => {
+  const importMusicdlPlaylist = useCallback(async (url: string) => {
     setLoading(true);
     setError(null);
-
+    setImportResult(null);
     try {
-      const [playlistData, tracksData] = await Promise.all([
-        getPlaylist(id),
-        getPlaylistTracks(id),
-      ]);
-
-      setPlaylist(playlistData);
-      setTracks(tracksData.tracks);
+      const result = await apiImportPlaylist(url);
+      setImportResult(result);
+      setTracks(result.tracks);
+      return result;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load playlist';
+      const message = err instanceof Error ? err.message : 'Import failed';
       setError(message);
-      setPlaylist(null);
-      setTracks([]);
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const extractPlaylistId = useCallback((url: string): string | null => {
-    const patterns = [
-      /[?&]id=(\d+)/,
-      /\/playlist\/(\d+)/,
-      /\/m\/playlist\?id=(\d+)/,
-      /\/m\/playlist\/(\d+)/,
-    ];
-
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
+  const checkDownloadStatus = useCallback(async () => {
+    try {
+      const status = await apiGetImportStatus();
+      setDownloadStatus(status);
+      return status;
+    } catch (err) {
+      // Silently fail for polling
+      return null;
     }
-
-    if (/^\d+$/.test(url)) return url;
-    return null;
   }, []);
 
-  const importPlaylist = useCallback(async (url: string) => {
-    const id = extractPlaylistId(url);
-    if (!id) {
-      setError('Invalid playlist URL');
-      return;
-    }
-    await loadPlaylist(id);
-  }, [extractPlaylistId, loadPlaylist]);
-
   return {
-    playlist,
     tracks,
     loading,
     error,
-    loadPlaylist,
-    importPlaylist,
-    extractPlaylistId,
+    importResult,
+    downloadStatus,
+    importMusicdlPlaylist,
+    checkDownloadStatus,
+    setTracks,
   };
 }
