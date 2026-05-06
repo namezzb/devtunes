@@ -1,109 +1,120 @@
 import { Router, Request, Response } from 'express';
 import { createMusicSource } from '../services/music-source-factory.js';
-import { neteaseService } from '../services/netease.js';
-import { resolveNeteaseUrl } from '../services/urlResolver.js';
-import axios from 'axios';
+import { MusicdlService } from '../services/musicdl-service.js';
+import { isValidNeteaseUrl } from '../services/url-resolver.js';
+import type { ParsedTrack } from '../types/musicdl.js';
 
 const router = Router();
+const musicdlService = new MusicdlService();
 
-interface ResolveRequestBody {
-  url: string;
+function isValidPlaylistId(id: string): boolean {
+  if (id === 'local-library') return true;
+  return !isNaN(parseInt(id, 10));
 }
 
-router.post('/resolve', async (req: Request, res: Response) => {
+router.post('/import', async (req: Request, res: Response) => {
   try {
-    const { url } = req.body as ResolveRequestBody;
+    const { url, targetDir } = req.body as { url?: string; targetDir?: string };
 
-    if (!url || typeof url !== 'string') {
-      res.status(400).json({ success: false, error: 'URL is required' });
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      res.status(400).json({ success: false, error: 'url is required' });
       return;
     }
 
-    const result = await resolveNeteaseUrl(url);
+    const trimmedUrl = url.trim();
 
-    if (result.type === 'unknown' || result.id === null) {
-      res.status(400).json({ success: false, error: 'Unable to resolve URL' });
+    if (!isValidNeteaseUrl(trimmedUrl)) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid playlist URL. Please provide a Netease Cloud Music playlist link (music.163.com or 163cn.tv).',
+      });
+      return;
+    }
+
+    const parsedTracks: ParsedTrack[] = await musicdlService.parsePlaylist(trimmedUrl);
+
+    if (parsedTracks.length === 0) {
+      res.status(200).json({
+        success: true,
+        data: {
+          playlistId: `musicdl-${Date.now()}`,
+          name: `Imported Playlist`,
+          tracks: [],
+        },
+        warning: 'The playlist was parsed but no songs were found. The Netease API may be temporarily unavailable or the playlist may be empty.',
+      });
       return;
     }
 
     res.json({
       success: true,
       data: {
-        type: result.type,
-        id: result.id,
-        resolvedUrl: result.resolvedUrl || result.originalUrl,
+        playlistId: `musicdl-${Date.now()}`,
+        name: `Imported Playlist`,
+        tracks: parsedTracks.map((t) => ({
+          id: t.id,
+          title: t.songName,
+          artist: t.singers,
+          coverUrl: t.coverUrl,
+          duration: t.durationS,
+          url: t.downloadUrl,
+          source: 'local' as const,
+        })),
       },
     });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (message.includes('ECONNREFUSED') || message.includes('connect') || message.includes('502')) {
+      res.status(503).json({
+        success: false,
+        error: 'Music parsing service is unavailable. Please try again later or check that the musicdl-service is running on port 3002.',
+      });
+      return;
+    }
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+router.get('/import-status', async (_req: Request, res: Response) => {
+  try {
+    const progress = await musicdlService.getDownloadStatus();
+    res.json({ success: true, data: progress });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ success: false, error: message });
   }
 });
 
-router.get('/proxy', async (req: Request, res: Response) => {
+router.post('/import/download', async (req: Request, res: Response) => {
   try {
-    const { url } = req.query;
-
-    if (!url || typeof url !== 'string') {
-      res.status(400).json({ success: false, error: 'URL is required' });
-      return;
-    }
-
-    if (!url.includes('music.126.net')) {
-      res.status(400).json({ success: false, error: 'Invalid audio URL' });
-      return;
-    }
-
-    const headers: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      'Referer': 'https://music.163.com/',
-      'Accept-Encoding': 'identity',
+    const { playlistUrl, targetDir, songIdentifiers } = req.body as {
+      playlistUrl?: string;
+      targetDir?: string;
+      songIdentifiers?: string[];
     };
 
-    const rangeHeader = req.headers['range'];
-    if (rangeHeader) {
-      headers['Range'] = rangeHeader;
+    if (!playlistUrl || typeof playlistUrl !== 'string' || !playlistUrl.trim()) {
+      res.status(400).json({ success: false, error: 'playlistUrl is required' });
+      return;
     }
 
-    const response = await axios.get(url, {
-      responseType: 'stream',
-      timeout: 0,
-      headers,
-    });
-
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length');
-
-    const contentType = (response.headers['content-type'] as string) || 'audio/mpeg';
-    res.setHeader('Content-Type', contentType);
-
-    if (response.headers['content-length']) {
-      res.setHeader('Content-Length', response.headers['content-length'] as string | number);
+    if (!targetDir || typeof targetDir !== 'string' || !targetDir.trim()) {
+      res.status(400).json({ success: false, error: 'targetDir is required' });
+      return;
     }
 
-    if (response.headers['content-range']) {
-      res.setHeader('Content-Range', response.headers['content-range']);
-      res.status(206);
-    }
+    const result = await musicdlService.downloadPlaylist(
+      playlistUrl.trim(),
+      targetDir.trim(),
+      songIdentifiers,
+    );
 
-    response.data.pipe(res);
-
-    response.data.on('error', (err: Error) => {
-      console.error('Stream error:', err.message);
-    });
+    res.json({ success: true, data: result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Proxy error';
-    console.error('Audio proxy error:', message);
+    const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ success: false, error: message });
   }
 });
-
-function isValidPlaylistId(id: string): boolean {
-  if (id === 'local-library') return true;
-  return !isNaN(parseInt(id, 10));
-}
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {

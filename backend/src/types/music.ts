@@ -5,7 +5,7 @@ export interface Track {
   coverUrl: string;
   duration: number;
   url?: string;
-  source: 'local' | 'netease';
+  source: 'local';
 }
 
 export interface Playlist {

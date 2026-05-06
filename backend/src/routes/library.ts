@@ -1,16 +1,22 @@
 import { Router, Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
-import { LocalFileSource } from '../services/local-file-source.js';
+import { LocalFileSource, resolveLibraryPath } from '../services/local-file-source.js';
 
 const router = Router();
 
 function getLocalFileSource(): LocalFileSource {
-  const musicDir = process.env.MUSIC_LIBRARY_PATH
-    ? path.resolve(process.env.MUSIC_LIBRARY_PATH.replace(/^~/, process.env.HOME || '~'))
-    : path.join(process.env.HOME || '/', 'Music');
-  return new LocalFileSource(musicDir);
+  return new LocalFileSource(resolveLibraryPath());
 }
+
+router.get('/config', (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      musicLibraryPath: resolveLibraryPath(),
+    },
+  });
+});
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
